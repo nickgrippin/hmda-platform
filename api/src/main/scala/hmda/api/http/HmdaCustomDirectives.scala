@@ -10,7 +10,8 @@ trait HmdaCustomDirectives {
 
     mapResponse { response =>
       val endTime = System.currentTimeMillis()
-      println(endTime - startTime)
+      val responseTime = endTime - startTime
+      println(s"$responseTime ms")
       response
     }
 
