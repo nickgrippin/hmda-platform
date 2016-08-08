@@ -8,14 +8,7 @@ Information contained in this repository should be considered provisional and a 
 
 ## Introduction
 
-The Home Mortgage Disclosure Act (HMDA) requires many financial institutions to maintain, report, and publicly disclose information about mortgages. HMDA was originally enacted by Congress in 1975 and is implemented by [Regulation C](https://www.gpo.gov/fdsys/pkg/CFR-2012-title12-vol8/xml/CFR-2012-title12-vol8-part1003.xml). The Dodd-Frank Act transferred HMDA rulemaking authority from the Federal Reserve Board to the Consumer Financial Protection Bureau (CFPB) on July 21, 2011.
-
-This regulation provides the public loan data that can be used to assist:
-* in determining whether financial institutions are serving the housing needs of their communities;
-* public officials in distributing public-sector investments so as to attract private investment to areas where it is needed;
-* and in identifying possible discriminatory lending patterns.
-
-This regulation applies to certain financial institutions, including banks, savings associations, credit unions, and other mortgage lending institutions.
+For more information on HMDA, checkout the [About HMDA page](http://www.consumerfinance.gov/data-research/hmda/learn-more) on the CFPB website.
 
 ## The HMDA Platform
 
@@ -101,32 +94,80 @@ java -jar target/scala-2.11/hmda.jar
 First, make sure that you have the [Docker Toolbox](https://www.docker.com/docker-toolbox) installed.
 
 If you don't have a Docker machine created, you can create one by issuing the following:
-
 ```shell
 docker-machine create --driver virtualbox dev
 ```
 
 After the machine is created, make sure that you connect your shell with the newly created machine
-
 ```shell
 $ eval "(docker-machine env dev)"
 ```
 
-From the project's root directory, run the following:
-
+Ensure there's a compiled jar to create the Docker image with:
 ```shell
-docker-compose up -d
+sbt assembly
+```
+#### To run only the API
+
+Build the docker image
+```shell
+docker build hmda-api .
 ```
 
-This will bring up all the HMDA Platform services (the first run might take a while). You can navigate to the HMDA HTTP API by
-going to the docker machine's endpoint. To find your docker machine endpoint:
+Then, run the docker image
+```shell
+docker run -d -p "8080:8080" hmda-api
+```
+
+The API will run on `$(docker-machine ip):8080`
+
+#### To run the entire platform
+Clone the [HMDA Platform UI](https://github.com/cfpb/hmda-platform-ui) directory into a sibling directory of this one. Your directory structure should look like this:
+```shell
+~/dev/hmda-project$ ls -la
+total 16
+drwxr-xr-x   6 lortone  staff   204B Jul 25 17:44 ./
+drwxr-xr-x   9 lortone  staff   306B Jul 25 17:50 ../
+drwxr-xr-x  22 lortone  staff   748B Jul 27 16:28 hmda-platform/
+drwxr-xr-x  25 lortone  staff   850B Jul 25 17:13 hmda-platform-ui/
+```
+
+From `hmda-platform`'s root directory, run the following:
+
+```shell
+docker-compose up -d --build
+```
+
+This will bring up all the HMDA Platform services. The first run may take several minutes.
+
+For convenience when doing development on the UI, the `docker-compose` file uses a `volumes` which mount the local directory into the `hmda-platform-ui` container. This means you can make UI changes and refresh the browser to view them.
+
+To build the front-end and allow "watching" for changes you can run:
+
+``` shell
+# while still in the hmda-platform directory
+cd ../hmda-platform-ui
+npm install # optional, to make sure you get the dependencies
+npm run watch
+```
+
+If you don't need to "watch" for changes you can run:
+
+``` shell
+# while still in the hmda-platform directory
+cd ../hmda-platform-ui
+npm install # optional, to make sure you get the dependencies
+npm run build:docker
+```
+
+This will simply build the front-end, still taking advantage of the mounted volume.
+
+View the app by visiting your docker machine's endpoint in the browser.
+To find your docker machine endpoint:
 
 ```shell
 docker-machine ip dev
 ```
-
-The HMDA Platform will be available at `<dev-ip>:8080`
-
 
 ## Contributing
 
@@ -142,4 +183,3 @@ We use GitHub issues in this repository to track features, bugs, and enhancement
 1. [TERMS](TERMS.md)
 2. [LICENSE](LICENSE)
 3. [CFPB Source Code Policy](https://github.com/cfpb/source-code-policy/)
-
