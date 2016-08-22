@@ -1,8 +1,11 @@
 package hmda.persistence.processing
 
+import akka.NotUsed
 import akka.actor.{ Actor, ActorLogging, ActorRef, ActorSystem, Props }
 import akka.persistence.PersistentActor
-import akka.stream.ActorMaterializer
+import akka.stream.{ ActorMaterializer, ClosedShape, FlowShape }
+import akka.stream.actor.ActorSubscriberMessage.OnComplete
+import akka.stream.scaladsl.{ Broadcast, Flow, GraphDSL, Merge, RunnableGraph, Sink, Source }
 import hmda.model.fi.lar.LoanApplicationRegister
 import hmda.model.fi.ts.TransmittalSheet
 import hmda.parser.fi.lar.LarCsvParser
@@ -11,6 +14,10 @@ import hmda.persistence.CommonMessages._
 import hmda.persistence.LocalEventPublisher
 import hmda.persistence.processing.HmdaRawFile.LineAdded
 import hmda.persistence.processing.HmdaQuery._
+
+import scala.concurrent.Future
+import scala.util.{ Failure, Success }
+import scalaz.StreamT.Done
 
 object HmdaFileParser {
 
@@ -71,36 +78,40 @@ class HmdaFileParser(submissionId: String) extends PersistentActor with ActorLog
   override def receiveCommand: Receive = {
 
     case ReadHmdaRawFile(persistenceId) =>
-      var finished = false
-      val parsedTs = events(persistenceId)
-        .map { case LineAdded(_, data) => data }
-        .take(1)
-        .map(line => TsCsvParser(line))
-        .map {
-          case Left(errors) => TsParsedErrors(errors)
-          case Right(ts) => TsParsed(ts)
-        }
 
-      parsedTs
-        .runForeach(pTs => self ! pTs)
-        .andThen {
-          case _ => if (!finished) finished = true else self ! Shutdown
-        }
+      val flow = Flow.fromGraph(GraphDSL.create() { implicit builder: GraphDSL.Builder[NotUsed] =>
+        import GraphDSL.Implicits._
+        val parsedTs: Flow[Event, Event, NotUsed] =
+          Flow[Event]
+            .map { case LineAdded(_, data) => data }
+            .take(1)
+            .map(line => TsCsvParser(line))
+            .map {
+              case Left(errors) => TsParsedErrors(errors)
+              case Right(ts) => TsParsed(ts)
+            }
 
-      val parsedLar = events(persistenceId)
-        .map { case LineAdded(_, data) => data }
-        .drop(1)
-        .map(line => LarCsvParser(line))
-        .map {
-          case Left(errors) => LarParsedErrors(errors)
-          case Right(lar) => LarParsed(lar)
-        }
+        val parsedLar: Flow[Event, Event, NotUsed] =
+          Flow[Event]
+            .map { case LineAdded(_, data) => data }
+            .drop(1)
+            .map(line => LarCsvParser(line))
+            .map {
+              case Left(errors) => LarParsedErrors(errors)
+              case Right(lar) => LarParsed(lar)
+            }
 
-      parsedLar
-        .runForeach(pLar => self ! pLar)
-        .andThen {
-          case _ => if (!finished) finished = true else self ! Shutdown
-        }
+        val bcast = builder.add(Broadcast[Event](2))
+        val merge = builder.add(Merge[Event](2))
+
+        bcast ~> parsedLar ~> merge
+        bcast ~> parsedTs ~> merge
+
+        FlowShape(bcast.in, merge.out)
+      })
+
+      flow
+        .runWith(events(persistenceId), Sink.actorRef(self, Shutdown))
 
     case tp @ TsParsed(ts) =>
       persist(tp) { e =>
@@ -140,4 +151,3 @@ class HmdaFileParser(submissionId: String) extends PersistentActor with ActorLog
   }
 
 }
-
