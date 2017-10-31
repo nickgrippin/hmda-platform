@@ -1,16 +1,16 @@
 package hmda.publication.reports.protocol
 
-import hmda.model.publication.reports.ActionTakenTypeEnum
-import hmda.model.publication.reports.ActionTakenTypeEnum._
+import hmda.model.publication.reports.DispositionEnum$
+import hmda.model.publication.reports.DispositionEnum._
 import spray.json.{ DefaultJsonProtocol, DeserializationException, JsString, JsValue, RootJsonFormat }
 
 trait ActionTakenTypeEnumProtocol extends DefaultJsonProtocol {
 
-  implicit object ActionTakenTypeEnumFormat extends RootJsonFormat[ActionTakenTypeEnum] {
+  implicit object ActionTakenTypeEnumFormat extends RootJsonFormat[DispositionEnum] {
 
-    override def write(obj: ActionTakenTypeEnum): JsValue = JsString(obj.description)
+    override def write(obj: DispositionEnum): JsValue = JsString(obj.description)
 
-    override def read(json: JsValue): ActionTakenTypeEnum = json match {
+    override def read(json: JsValue): DispositionEnum = json match {
       case JsString(description) => description match {
         case ApplicationReceived.description => ApplicationReceived
         case LoansOriginated.description => LoansOriginated
