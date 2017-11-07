@@ -8,4 +8,8 @@ case class Disposition(
   def +(disp: Disposition): Disposition = {
     Disposition(disposition, count + disp.count, value + disp.value)
   }
+
+  override def toString: String = {
+    return s""""""
+  }
 }
