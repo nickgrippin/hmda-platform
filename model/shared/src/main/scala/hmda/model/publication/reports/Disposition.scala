@@ -10,10 +10,10 @@ case class Disposition(
   }
 
   def toJsonFormat: String = {
-    s"""{
-       "name": "${disposition.value}",
-       "count": $count,
-       "value": $value
-      }"""
+    s"""|{
+        |  "name": "${disposition.value}",
+        |  "count": $count,
+        |  "value": $value
+        |}"""
   }
 }

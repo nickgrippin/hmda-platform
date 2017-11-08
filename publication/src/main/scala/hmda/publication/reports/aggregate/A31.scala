@@ -16,6 +16,7 @@ import hmda.publication.reports.util.DispositionType._
 import hmda.publication.reports.util.ReportUtil._
 
 import scala.concurrent.Future
+import spray.json._
 
 case class A31(
   year: Int,
@@ -31,9 +32,10 @@ object A31 {
   def generate[ec: EC, mat: MAT, as: AS](
     larSource: Source[LoanApplicationRegister, NotUsed],
     fipsCode: Int
-  ): Future[String] = {
+  ): Future[JsValue] = {
     val incomeIntervals = larsByIncomeInterval(larSource.filter(lar => lar.applicant.income != "NA"), calculateMedianIncomeIntervals(fipsCode))
     val msa = msaReport(fipsCode.toString).toJsonFormat
+    val date = formattedCurrentDate
     for {
       r1 <- getDispositionsString(filterRace(larSource, AmericanIndianOrAlaskaNative))
       r2 <- getDispositionsString(filterRace(larSource, Asian))
@@ -57,170 +59,173 @@ object A31 {
       i6 <- getDispositionsString(larSource.filter(lar => lar.applicant.income == "NA"))
       t <- getDispositionsString(larSource)
     } yield {
-      s"""{
-        "table": "3-1",
-        "type": "Aggregate",
-        "desc": "Loans sold, by characteristics of borrower and census tract in which property is located and by type of purchaser (includes originations and purchased loans)",
-        "year": "2017",
-        "report-date": "",
-        "msa": $msa,
-        "borrowercharacteristics": [
-        {
-          "characteristic": "Race",
-          "races": [
-          {
-            "race": "American Indian/Alaska Native",
-            "purchasers": $r1
-          },
-          {
-            "race": "Asian",
-            "purchasers": $r2
-          },
-          {
-            "race": "Black or African American",
-            "purchasers": $r3
-          },
-          {
-            "race": "Native Hawaiian or Other Pacific Islander",
-            "purchasers": $r4
-          },
-          {
-            "race": "White",
-            "purchasers": $r5
-          },
-          {
-            "race": "2 or more minority races",
-            "purchasers": $r6
-          },
-          {
-            "race": "Joint (White/Minority Race)",
-            "purchasers": $r7
-          },
-          {
-            "race": "Race Not Available",
-            "purchasers": $r8
-          }
-          ]
-        },
-        {
-          "characteristic": "Ethnicity",
-          "ethnicities": [
-          {
-            "ethnicity": "Hispanic or Latino",
-            "purchasers": $e1
-          },
-          {
-            "ethnicity": "Not Hispanic or Latino",
-            "purchasers": $e2
-          },
-          {
-            "ethnicity": "Joint (Hispanic or Latino/Not Hispanic or Latino)",
-            "purchasers": $e3
-          },
-          {
-            "ethnicity": "Ethnicity Not Available",
-            "purchasers": $e4
-          }
-          ]
-        },
-        {
-          "characteristic": "Minority Status",
-          "minoritystatuses": [
-          {
-            "minoritystatus": "White Non-Hispanic",
-            "purchasers": $m1
-          },
-          {
-            "minoritystatus": "Others, Including Hispanic",
-            "purchasers": $m2
-          }
-          ]
-        },
-        {
-          "characteristic": "Applicant Income",
-          "applicantincomes": [
-          {
-            "applicantincome": "Less than 50% of MSA/MD median",
-            "purchasers": $i1
-          },
-          {
-            "applicantincome": "50-79% of MSA/MD median",
-            "purchasers": $i2
-          },
-          {
-            "applicantincome": "80-99% of MSA/MD median",
-            "purchasers": $i3
-          },
-          {
-            "applicantincome": "100-119% of MSA/MD median",
-            "purchasers": $i4
-          },
-          {
-            "applicantincome": "120% or more of MSA/MD median",
-            "purchasers": $i5
-          },
-          {
-            "applicantincome": "Income Not Available",
-            "purchasers": $i6
-          }
-          ]
-        }
-        ],
-        "censuscharacteristics": [
-        {
-          "characteristic": "Racial/Ethnic Composition",
-          "tractpctminorities": [
-          {
-            "tractpctminority": "Less than 10% minority",
-            "purchasers": {}
-          },
-          {
-            "tractpctminority": "10-19% minority",
-            "purchasers": {}
-          },
-          {
-            "tractpctminority": "20-49% minority",
-            "purchasers": {}
-          },
-          {
-            "tractpctminority": "50-79% minority",
-            "purchasers": {}
-          },
-          {
-            "tractpctminority": "80-100% minority",
-            "purchasers": {}
-          }
-          ]
-        },
-        {
-          "characteristic": "Income",
-          "incomelevels": [
-          {
-            "incomelevel": "Low income",
-            "purchasers": {}
-          },
-          {
-            "incomelevel": "Moderate income",
-            "purchasers": {}
-          },
-          {
-            "incomelevel": "Middle income",
-            "purchasers": {}
-          },
-          {
-            "incomelevel": "Upper income",
-            "purchasers": {}
-          }
-          ]
-        }
-        ],
-        "total": {
-          "purchasers": $t
-        }
-    }"""
+      s"""
+         |{
+         |  "table": "3-1",
+         |  "type": "Aggregate",
+         |  "desc": "Loans sold, by characteristics of borrower and census tract in which property is located and by type of purchaser (includes originations and purchased loans)",
+         |  "year": "2017",
+         |  "report-date": "$date",
+         |  "msa": $msa,
+         |  "borrowercharacteristics": [
+         |  {
+         |    "characteristic": "Race",
+         |    "races": [
+         |    {
+         |      "race": "American Indian/Alaska Native",
+         |      "purchasers": $r1
+         |    },
+         |    {
+         |      "race": "Asian",
+         |      "purchasers": $r2
+         |    },
+         |    {
+         |      "race": "Black or African American",
+         |      "purchasers": $r3
+         |    },
+         |    {
+         |      "race": "Native Hawaiian or Other Pacific Islander",
+         |      "purchasers": $r4
+         |    },
+         |    {
+         |      "race": "White",
+         |      "purchasers": $r5
+         |    },
+         |    {
+         |      "race": "2 or more minority races",
+         |      "purchasers": $r6
+         |    },
+         |    {
+         |      "race": "Joint (White/Minority Race)",
+         |      "purchasers": $r7
+         |    },
+         |    {
+         |      "race": "Race Not Available",
+         |      "purchasers": $r8
+         |    }
+         |    ]
+         |  },
+         |  {
+         |    "characteristic": "Ethnicity",
+         |    "ethnicities": [
+         |    {
+         |      "ethnicity": "Hispanic or Latino",
+         |      "purchasers": $e1
+         |    },
+         |    {
+         |      "ethnicity": "Not Hispanic or Latino",
+         |      "purchasers": $e2
+         |    },
+         |    {
+         |      "ethnicity": "Joint (Hispanic or Latino/Not Hispanic or Latino)",
+         |      "purchasers": $e3
+         |    },
+         |    {
+         |      "ethnicity": "Ethnicity Not Available",
+         |      "purchasers": $e4
+         |    }
+         |    ]
+         |  },
+         |  {
+         |    "characteristic": "Minority Status",
+         |    "minoritystatuses": [
+         |    {
+         |      "minoritystatus": "White Non-Hispanic",
+         |      "purchasers": $m1
+         |    },
+         |    {
+         |      "minoritystatus": "Others, Including Hispanic",
+         |      "purchasers": $m2
+         |    }
+         |    ]
+         |  },
+         |  {
+         |    "characteristic": "Applicant Income",
+         |    "applicantincomes": [
+         |    {
+         |      "applicantincome": "Less than 50% of MSA/MD median",
+         |      "purchasers": $i1
+         |    },
+         |    {
+         |      "applicantincome": "50-79% of MSA/MD median",
+         |      "purchasers": $i2
+         |    },
+         |    {
+         |      "applicantincome": "80-99% of MSA/MD median",
+         |      "purchasers": $i3
+         |    },
+         |    {
+         |      "applicantincome": "100-119% of MSA/MD median",
+         |      "purchasers": $i4
+         |    },
+         |    {
+         |      "applicantincome": "120% or more of MSA/MD median",
+         |      "purchasers": $i5
+         |    },
+         |    {
+         |      "applicantincome": "Income Not Available",
+         |      "purchasers": $i6
+         |    }
+         |    ]
+         |  }
+         |  ],
+         |  "censuscharacteristics": [
+         |  {
+         |    "characteristic": "Racial/Ethnic Composition",
+         |    "tractpctminorities": [
+         |    {
+         |      "tractpctminority": "Less than 10% minority",
+         |      "purchasers": {}
+         |    },
+         |    {
+         |      "tractpctminority": "10-19% minority",
+         |      "purchasers": {}
+         |    },
+         |    {
+         |      "tractpctminority": "20-49% minority",
+         |      "purchasers": {}
+         |    },
+         |    {
+         |      "tractpctminority": "50-79% minority",
+         |      "purchasers": {}
+         |    },
+         |    {
+         |      "tractpctminority": "80-100% minority",
+         |      "purchasers": {}
+         |    }
+         |    ]
+         |  },
+         |  {
+         |    "characteristic": "Income",
+         |    "incomelevels": [
+         |    {
+         |      "incomelevel": "Low income",
+         |      "purchasers": {}
+         |    },
+         |    {
+         |      "incomelevel": "Moderate income",
+         |      "purchasers": {}
+         |    },
+         |    {
+         |      "incomelevel": "Middle income",
+         |      "purchasers": {}
+         |    },
+         |    {
+         |      "incomelevel": "Upper income",
+         |      "purchasers": {}
+         |    }
+         |    ]
+         |  }
+         |  ],
+         |  "total": {
+         |    "purchasers": $t
+         |  }
+         |}
+       """.stripMargin.parseJson
     }
   }
 
+  // Calculate the column values for a pre-filtered row
   def getDispositionsString[ec: EC, mat: MAT, as: AS](larSource: Source[LoanApplicationRegister, NotUsed]): Future[String] = {
     for {
       fMae <- FannieMaeDisp.calculateDisposition(larSource)
@@ -234,16 +239,16 @@ object A31 {
       other <- OtherPurchaserDisp.calculateDisposition(larSource)
     } yield {
       s"""[
-        ${fMae.toJsonFormat},
-        ${gMae.toJsonFormat},
-        ${frMac.toJsonFormat},
-        ${faMac.toJsonFormat},
-        ${pSec.toJsonFormat},
-        ${cBnk.toJsonFormat},
-        ${fCmp.toJsonFormat},
-        ${aff.toJsonFormat},
-        ${other.toJsonFormat}
-      ]"""
+      |  ${fMae.toJsonFormat},
+      |  ${gMae.toJsonFormat},
+      |  ${frMac.toJsonFormat},
+      |  ${faMac.toJsonFormat},
+      |  ${pSec.toJsonFormat},
+      |  ${cBnk.toJsonFormat},
+      |  ${fCmp.toJsonFormat},
+      |  ${aff.toJsonFormat},
+      |  ${other.toJsonFormat}
+      ]""".stripMargin
     }
   }
 }
