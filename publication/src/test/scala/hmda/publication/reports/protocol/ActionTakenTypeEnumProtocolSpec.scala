@@ -1,6 +1,6 @@
 package hmda.publication.reports.protocol
 
-import hmda.model.publication.reports.DispositionEnum$
+import hmda.model.publication.reports.DispositionEnum
 import org.scalatest.{ MustMatchers, PropSpec }
 import org.scalatest.prop.PropertyChecks
 import hmda.publication.reports.ReportGenerators._

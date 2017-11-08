@@ -1,33 +1,33 @@
 package hmda.model.publication.reports
 
-import enumeratum.values.{ IntEnum, IntEnumEntry }
+import enumeratum.values.{ StringEnum, StringEnumEntry }
 
 sealed abstract class DispositionEnum(
-  override val value: Int,
-  val description: String
-) extends IntEnumEntry
+  override val value: String,
+  val numberValue: Int
+) extends StringEnumEntry
 
-object DispositionEnum extends IntEnum[DispositionEnum] {
+object DispositionEnum extends StringEnum[DispositionEnum] {
 
   val values = findValues
 
-  case object ApplicationReceived extends DispositionEnum(0, "Application Received")
-  case object LoansOriginated extends DispositionEnum(1, "Loans Originated")
-  case object ApprovedButNotAccepted extends DispositionEnum(2, "Apps. Approved But Not Accepted")
-  case object ApplicationsDenied extends DispositionEnum(3, "Applications Denied")
-  case object ApplicationsWithdrawn extends DispositionEnum(4, "Applications Withdrawn")
-  case object ClosedForIncompleteness extends DispositionEnum(5, "Files Closed for Incompleteness")
-  case object LoanPurchased extends DispositionEnum(6, "Loan Purchased by your Institution")
-  case object PreapprovalDenied extends DispositionEnum(7, "Preapproval Request Denied by Financial Institution")
-  case object PreapprovalApprovedButNotAccepted extends DispositionEnum(8, "Preapproval Request Approved but not Accepted by Financial Institution")
+  case object ApplicationReceived extends DispositionEnum("Application Received", 0)
+  case object LoansOriginated extends DispositionEnum("Loans Originated", 1)
+  case object ApprovedButNotAccepted extends DispositionEnum("Apps. Approved But Not Accepted", 2)
+  case object ApplicationsDenied extends DispositionEnum("Applications Denied", 3)
+  case object ApplicationsWithdrawn extends DispositionEnum("Applications Withdrawn", 4)
+  case object ClosedForIncompleteness extends DispositionEnum("Files Closed for Incompleteness", 5)
+  case object LoanPurchased extends DispositionEnum("Loan Purchased by your Institution", 6)
+  case object PreapprovalDenied extends DispositionEnum("Preapproval Request Denied by Financial Institution", 7)
+  case object PreapprovalApprovedButNotAccepted extends DispositionEnum("Preapproval Request Approved but not Accepted by Financial Institution", 8)
 
-  case object FannieMae extends DispositionEnum(1, "Fannie Mae")
-  case object GinnieMae extends DispositionEnum(2, "Ginnie Mae")
-  case object FreddieMac extends DispositionEnum(3, "FreddieMac")
-  case object FarmerMac extends DispositionEnum(4, "FarmerMac")
-  case object PrivateSecuritization extends DispositionEnum(5, "Private Securitization")
-  case object CommercialBank extends DispositionEnum(6, "Commercial bank, savings bank or association")
-  case object FinanceCompany extends DispositionEnum(7, "Life insurance co., credit union, finance co.")
-  case object Affiliate extends DispositionEnum(8, "Affiliate institution")
-  case object OtherPurchaser extends DispositionEnum(9, "Other")
+  case object FannieMae extends DispositionEnum("Fannie Mae", 1)
+  case object GinnieMae extends DispositionEnum("Ginnie Mae", 2)
+  case object FreddieMac extends DispositionEnum("FreddieMac", 3)
+  case object FarmerMac extends DispositionEnum("FarmerMac", 4)
+  case object PrivateSecuritization extends DispositionEnum("Private Securitization", 5)
+  case object CommercialBank extends DispositionEnum("Commercial bank, savings bank or association", 6)
+  case object FinanceCompany extends DispositionEnum("Life insurance co., credit union, finance co.", 7)
+  case object Affiliate extends DispositionEnum("Affiliate institution", 8)
+  case object OtherPurchaser extends DispositionEnum("Other", 9)
 }

@@ -11,22 +11,22 @@ import hmda.publication.reports.util.ReportsMetaDataLookup
 import scala.concurrent.Future
 
 case class A3X(
-                year: Int,
-                msa: MSAReport,
-                applicantIncomes: List[ApplicantIncome],
-                total: List[Disposition],
-                table: String,
-                description: String,
-                reportDate: String = formattedCurrentDate
-              ) extends AggregateReport
+  year: Int,
+  msa: MSAReport,
+  applicantIncomes: List[ApplicantIncome],
+  total: List[Disposition],
+  table: String,
+  description: String,
+  reportDate: String = formattedCurrentDate
+) extends AggregateReport
 
 object A3X {
   def generate[ec: EC, mat: MAT, as: AS](
-                                          reportId: String,
-                                          larSource: Source[LoanApplicationRegister, NotUsed],
-                                          fipsCode: Int,
-                                          filters: LoanApplicationRegister => Boolean
-                                        ): Future[A3X] = {
+    reportId: String,
+    larSource: Source[LoanApplicationRegister, NotUsed],
+    fipsCode: Int,
+    filters: LoanApplicationRegister => Boolean
+  ): Future[A3X] = {
 
     val metaData = ReportsMetaDataLookup.values(reportId)
     val dispositions = metaData.dispositions
