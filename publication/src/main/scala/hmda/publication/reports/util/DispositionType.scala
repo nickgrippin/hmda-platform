@@ -22,6 +22,7 @@ sealed abstract class DispositionType(
       count <- loanCountF
       total <- totalValueF
     } yield {
+      println(s"Calculated disposition ${this.value} with a count of $count and a total of $total")
       ValueDisposition(value, count, total)
     }
   }

@@ -81,7 +81,7 @@ trait CassandraRepository[A] {
   }
   def insertData(source: Source[A, NotUsed]): Future[Done]
   def readData(fetchSize: Int): Source[A, NotUsed] = {
-    val statement = new SimpleStatement(s"SELECT * FROM $keyspace.$table").setFetchSize(fetchSize)
+    val statement = new SimpleStatement(s"SELECT * FROM $keyspace.$table").setFetchSize(fetchSize).setReadTimeoutMillis(0)
     val rowSource = CassandraSource(statement)
     val entitySource = rowSource.via(parseRows)
     entitySource
