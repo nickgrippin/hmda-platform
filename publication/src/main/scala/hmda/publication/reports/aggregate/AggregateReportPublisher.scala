@@ -113,7 +113,7 @@ class AggregateReportPublisher extends HmdaActor with LoanApplicationRegisterCas
     val simpleReportFlow: Flow[(Int, AggregateReport), AggregateReportPayload, NotUsed] =
       Flow[(Int, AggregateReport)].mapAsyncUnordered(5) {
         case (msa, report) => {
-          log.info(s"Calling generate on for MSA $msa")
+          log.info(s"Calling generate on ${report.getClass.getName} for MSA $msa")
           report.generate(larSource, msa)
         }
       }
