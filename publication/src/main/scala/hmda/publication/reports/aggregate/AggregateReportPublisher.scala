@@ -1,20 +1,23 @@
 package hmda.publication.reports.aggregate
 
+import java.nio.file.Paths
 import java.util.concurrent.CompletionStage
 
 import akka.NotUsed
 import akka.actor.{ ActorSystem, Props }
 import akka.stream.{ ActorMaterializer, ActorMaterializerSettings, Supervision }
 import akka.stream.Supervision._
-import akka.stream.alpakka.s3.javadsl.S3Client
+import akka.stream.alpakka.s3.scaladsl.S3Client
 import akka.stream.alpakka.s3.{ MemoryBufferType, S3Settings }
-import akka.stream.scaladsl.{ Flow, Sink, Source }
+import akka.stream.scaladsl.{ FileIO, Flow, Framing, Keep, Sink, Source }
 import akka.util.{ ByteString, Timeout }
 import com.amazonaws.auth.{ AWSStaticCredentialsProvider, BasicAWSCredentials }
 import hmda.persistence.model.HmdaActor
 import hmda.query.repository.filing.LoanApplicationRegisterCassandraRepository
 import akka.stream.alpakka.s3.javadsl.MultipartUploadResult
 import hmda.census.model.MsaIncomeLookup
+import hmda.model.fi.lar.LoanApplicationRegister
+import hmda.parser.fi.lar.LarCsvParser
 import hmda.persistence.messages.commands.publication.PublicationCommands.GenerateAggregateReports
 
 import scala.concurrent.duration._
@@ -29,6 +32,10 @@ class AggregateReportPublisher extends HmdaActor with LoanApplicationRegisterCas
   val decider: Decider = { e =>
     repositoryLog.error("Unhandled error in stream", e)
     Supervision.Resume
+  }
+
+  def framing: Flow[ByteString, ByteString, NotUsed] = {
+    Framing.delimiter(ByteString("\n"), maximumFrameLength = 65536, allowTruncation = true)
   }
 
   override implicit def system: ActorSystem = context.system
@@ -48,7 +55,7 @@ class AggregateReportPublisher extends HmdaActor with LoanApplicationRegisterCas
     new BasicAWSCredentials(accessKeyId, secretAccess)
   )
   val awsSettings = new S3Settings(MemoryBufferType, None, awsCredentials, region, false)
-  val s3Client = new S3Client(awsSettings, context.system, materializer)
+  val s3Client = new S3Client(awsSettings)
 
   val aggregateReports: List[AggregateReport] = List(
     A1, A2,
@@ -66,7 +73,7 @@ class AggregateReportPublisher extends HmdaActor with LoanApplicationRegisterCas
   )
 
   val nationalAggregateReports: List[AggregateReport] = List(
-    /*NationalAggregateA1, NationalAggregateA2, NationalAggregateA3,
+    NationalAggregateA1, NationalAggregateA2, NationalAggregateA3,
     NationalAggregateA4,
     NationalAggregateB,
     N32,
@@ -75,7 +82,7 @@ class AggregateReportPublisher extends HmdaActor with LoanApplicationRegisterCas
     N71, N72, N73, N74, N75, N76, N77,
     N81, N82, N83, N84, N85, N86, N87,
     N9,
-    N11_1, N11_2, N11_3, N11_4, N11_5, N11_6, N11_7, N11_8, N11_9, N11_10,*/
+    N11_1, N11_2, N11_3, N11_4, N11_5, N11_6, N11_7, N11_8, N11_9, N11_10,
     N12_1, N12_2
   )
 
@@ -89,14 +96,26 @@ class AggregateReportPublisher extends HmdaActor with LoanApplicationRegisterCas
   }
 
   private def generateReports = {
-    val larSource = readData(1000)
+    val byteStringToLarFlow: Flow[ByteString, LoanApplicationRegister, NotUsed] =
+      Flow[ByteString]
+        .map(s => LarCsvParser(s.utf8String) match {
+          case Right(lar) => lar
+        })
+
+    val larSource = FileIO.fromPath(Paths.get("./src/main/resources/2018-03-25_lar.txt"))
+      .via(framing)
+      .viaMat(byteStringToLarFlow)(Keep.none)
+
     val msaList = MsaIncomeLookup.everyFips.toList
 
     val combinations = combine(List(-1), nationalAggregateReports)
 
     val simpleReportFlow: Flow[(Int, AggregateReport), AggregateReportPayload, NotUsed] =
-      Flow[(Int, AggregateReport)].mapAsyncUnordered(1) {
-        case (msa, report) => report.generate(larSource, msa)
+      Flow[(Int, AggregateReport)].mapAsyncUnordered(5) {
+        case (msa, report) => {
+          log.info(s"Calling generate on for MSA $msa")
+          report.generate(larSource, msa)
+        }
       }
 
     val s3Flow: Flow[AggregateReportPayload, CompletionStage[MultipartUploadResult], NotUsed] =
@@ -108,6 +127,18 @@ class AggregateReportPublisher extends HmdaActor with LoanApplicationRegisterCas
           Source.single(ByteString(payload.report))
             .runWith(s3Client.multipartUpload(bucket, filePath))
         })
+
+    /*val printFlow: Flow[LoanApplicationRegister, LoanApplicationRegister, NotUsed] =
+      Flow[LoanApplicationRegister].take(1).map(lar => {
+        log.info(lar.toCSV)
+        lar
+      })
+
+    val x = larSource.via(printFlow).runWith(Sink.seq)
+
+    for {
+      y <- x
+    } yield println(y)*/
 
     Source(combinations).via(simpleReportFlow).via(s3Flow).runWith(Sink.ignore)
   }
