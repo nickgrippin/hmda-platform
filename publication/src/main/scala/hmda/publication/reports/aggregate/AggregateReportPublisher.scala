@@ -7,7 +7,7 @@ import akka.NotUsed
 import akka.actor.{ ActorSystem, Props }
 import akka.stream.{ ActorMaterializer, ActorMaterializerSettings, Supervision }
 import akka.stream.Supervision._
-import akka.stream.alpakka.s3.scaladsl.S3Client
+import akka.stream.alpakka.s3.javadsl.S3Client
 import akka.stream.alpakka.s3.{ MemoryBufferType, S3Settings }
 import akka.stream.scaladsl.{ FileIO, Flow, Framing, Keep, Sink, Source }
 import akka.util.{ ByteString, Timeout }
@@ -21,6 +21,7 @@ import hmda.parser.fi.lar.LarCsvParser
 import hmda.persistence.messages.commands.publication.PublicationCommands.GenerateAggregateReports
 
 import scala.concurrent.duration._
+import scala.util.Try
 
 object AggregateReportPublisher {
   val name = "aggregate-report-publisher"
@@ -102,7 +103,11 @@ class AggregateReportPublisher extends HmdaActor with LoanApplicationRegisterCas
           case Right(lar) => lar
         })
 
-    val larSource = FileIO.fromPath(Paths.get("./src/main/resources/2018-03-25_lar.txt"))
+    val larSourceTry = Try(FileIO.fromPath(Paths.get("./src/main/resources/2018-03-25_lar.txt")))
+
+    if(!larSourceTry.isSuccess) log.error("Could not find file")
+
+    val larSource = larSourceTry.getOrElse(Source.empty)
       .via(framing)
       .viaMat(byteStringToLarFlow)(Keep.none)
 
