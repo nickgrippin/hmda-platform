@@ -1,5 +1,6 @@
 package hmda.publication.reports.aggregate
 
+import java.io.File
 import java.nio.file.Paths
 import java.util.concurrent.{ CompletionStage, Executors }
 
@@ -74,8 +75,7 @@ class AggregateReportPublisher extends HmdaActor {
     A12_1, A12_2
   )
 
-  val nationalAggregateReports: List[AggregateReport] = List(
-    NationalAggregateA1, NationalAggregateA2, NationalAggregateA3,
+  val nationalAggregateReports: List[AggregateReport] = List( /*NationalAggregateA1, NationalAggregateA2, NationalAggregateA3,
     NationalAggregateA4,
     NationalAggregateB,
     N32,
@@ -85,8 +85,7 @@ class AggregateReportPublisher extends HmdaActor {
     N81, N82, N83, N84, N85, N86, N87,
     N9,
     N11_1, N11_2, N11_3, N11_4, N11_5, N11_6, N11_7, N11_8, N11_9, N11_10,
-    N12_1, N12_2
-  )
+    N12_1, N12_2*/ )
 
   override def receive: Receive = {
 
@@ -104,7 +103,11 @@ class AggregateReportPublisher extends HmdaActor {
           case Right(lar) => lar
         })
 
-    val larSourceTry = Try(FileIO.fromPath(Paths.get("./src/main/resources/2018-03-25_lar.txt")))
+    val filePath = new File(getClass.getClassLoader.getResource("2018-03-25_lar.txt").getFile).getAbsolutePath
+
+    log.info(s"FILE PATH IS $filePath")
+
+    val larSourceTry = Try(FileIO.fromPath(Paths.get(filePath)))
 
     if (!larSourceTry.isSuccess) log.error("Could not find file")
 
