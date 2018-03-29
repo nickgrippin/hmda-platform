@@ -10,7 +10,7 @@ import akka.stream.{ ActorMaterializer, ActorMaterializerSettings, Supervision }
 import akka.stream.Supervision._
 import akka.stream.alpakka.s3.javadsl.S3Client
 import akka.stream.alpakka.s3.{ MemoryBufferType, S3Settings }
-import akka.stream.scaladsl.{ FileIO, Flow, Framing, Keep, Sink, Source }
+import akka.stream.scaladsl.{ FileIO, Flow, Framing, Keep, Sink, Source, StreamConverters }
 import akka.util.{ ByteString, Timeout }
 import com.amazonaws.auth.{ AWSStaticCredentialsProvider, BasicAWSCredentials }
 import hmda.persistence.model.HmdaActor
@@ -105,15 +105,11 @@ class AggregateReportPublisher extends HmdaActor {
           case Right(lar) => lar
         })
 
-    val filePath = new File(getClass.getClassLoader.getResource("2018-03-25_lar.txt").getFile).getAbsolutePath
+    val filePath = getClass.getResourceAsStream("2018-03-25_lar.txt")
 
-    log.info(s"FILE PATH IS $filePath")
+    val larSourceTry = StreamConverters.fromInputStream(() => filePath)
 
-    val larSourceTry = Try(FileIO.fromPath(Paths.get(filePath)))
-
-    if (!larSourceTry.isSuccess) log.error("Could not find file")
-
-    val larSource = larSourceTry.getOrElse(Source.empty)
+    val larSource = larSourceTry
       .via(framing)
       .viaMat(byteStringToLarFlow)(Keep.none)
 
