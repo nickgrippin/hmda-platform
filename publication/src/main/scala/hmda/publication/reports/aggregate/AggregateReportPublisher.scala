@@ -1,7 +1,7 @@
 package hmda.publication.reports.aggregate
 
 import java.nio.file.Paths
-import java.util.concurrent.CompletionStage
+import java.util.concurrent.{ CompletionStage, Executors }
 
 import akka.NotUsed
 import akka.actor.{ ActorSystem, Props }
@@ -13,13 +13,14 @@ import akka.stream.scaladsl.{ FileIO, Flow, Framing, Keep, Sink, Source }
 import akka.util.{ ByteString, Timeout }
 import com.amazonaws.auth.{ AWSStaticCredentialsProvider, BasicAWSCredentials }
 import hmda.persistence.model.HmdaActor
-import hmda.query.repository.filing.LoanApplicationRegisterCassandraRepository
 import akka.stream.alpakka.s3.javadsl.MultipartUploadResult
+import com.typesafe.config.ConfigFactory
 import hmda.census.model.MsaIncomeLookup
 import hmda.model.fi.lar.LoanApplicationRegister
 import hmda.parser.fi.lar.LarCsvParser
 import hmda.persistence.messages.commands.publication.PublicationCommands.GenerateAggregateReports
 
+import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.util.Try
 
@@ -28,10 +29,10 @@ object AggregateReportPublisher {
   def props(): Props = Props(new AggregateReportPublisher)
 }
 
-class AggregateReportPublisher extends HmdaActor with LoanApplicationRegisterCassandraRepository {
+class AggregateReportPublisher extends HmdaActor {
+  val config = ConfigFactory.load()
 
   val decider: Decider = { e =>
-    repositoryLog.error("Unhandled error in stream", e)
     Supervision.Resume
   }
 
@@ -39,10 +40,10 @@ class AggregateReportPublisher extends HmdaActor with LoanApplicationRegisterCas
     Framing.delimiter(ByteString("\n"), maximumFrameLength = 65536, allowTruncation = true)
   }
 
-  override implicit def system: ActorSystem = context.system
+  implicit def system: ActorSystem = context.system
   val materializerSettings = ActorMaterializerSettings(system).withSupervisionStrategy(decider)
-  override implicit def materializer: ActorMaterializer = ActorMaterializer(materializerSettings)(system)
-
+  implicit def materializer: ActorMaterializer = ActorMaterializer(materializerSettings)(system)
+  implicit def ec: ExecutionContext = ExecutionContext.fromExecutor(new java.util.concurrent.ForkJoinPool())
   val duration = config.getInt("hmda.actor.timeout")
   implicit val timeout = Timeout(duration.seconds)
 
@@ -56,7 +57,7 @@ class AggregateReportPublisher extends HmdaActor with LoanApplicationRegisterCas
     new BasicAWSCredentials(accessKeyId, secretAccess)
   )
   val awsSettings = new S3Settings(MemoryBufferType, None, awsCredentials, region, false)
-  val s3Client = new S3Client(awsSettings)
+  val s3Client = new S3Client(awsSettings, system, materializer)
 
   val aggregateReports: List[AggregateReport] = List(
     A1, A2,
@@ -105,7 +106,7 @@ class AggregateReportPublisher extends HmdaActor with LoanApplicationRegisterCas
 
     val larSourceTry = Try(FileIO.fromPath(Paths.get("./src/main/resources/2018-03-25_lar.txt")))
 
-    if(!larSourceTry.isSuccess) log.error("Could not find file")
+    if (!larSourceTry.isSuccess) log.error("Could not find file")
 
     val larSource = larSourceTry.getOrElse(Source.empty)
       .via(framing)
