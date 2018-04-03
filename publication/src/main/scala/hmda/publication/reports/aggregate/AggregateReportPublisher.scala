@@ -92,9 +92,9 @@ class AggregateReportPublisher extends HmdaActor with ResourceUtils {
 
   override def receive: Receive = {
 
-    case GenerateAggregateReports() =>
-      log.info(s"Generating aggregate reports for 2017 filing year")
-      generateReports
+    case GenerateAggregateReports(start: Int) =>
+      log.info(s"Generating aggregate reports for 2017 filing year starting at index $start")
+      generateReports(start)
 
     case _ => //do nothing
   }
@@ -133,10 +133,10 @@ class AggregateReportPublisher extends HmdaActor with ResourceUtils {
           .runWith(s3Client.multipartUpload(bucket, filePath))
       })
 
-  private def generateReports = {
+  private def generateReports(start: Int) = {
     val msaList = MsaIncomeLookup.everyFips.toList
 
-    val shortenedList = msaList.drop(10).filterNot(_ == -1)
+    val shortenedList = msaList.drop(start).filterNot(_ == -1)
 
     shortenedList.foreach(msa => {
       val reports = generateMSAReports2(msa)

@@ -66,12 +66,12 @@ trait PublicationAdminHttpApi extends HmdaCustomDirectives with ApiErrorProtocol
     }
 
   def aggregateGenerationPath(supervisor: ActorRef, publicationSupervisor: ActorRef) =
-    path("aggregate" / "2017") {
+    path("aggregate" / "2017" / IntNumber) { (start) =>
       extractExecutionContext { executor =>
         implicit val ec = executor
         timedPost { uri =>
           val publisherF = (publicationSupervisor ? FindAggregatePublisher()).mapTo[ActorRef]
-          val msg = publisherF.map(_ ! GenerateAggregateReports())
+          val msg = publisherF.map(_ ! GenerateAggregateReports(start))
 
           onComplete(msg) {
             case Success(sub) => complete(ToResponseMarshallable(StatusCodes.OK))
