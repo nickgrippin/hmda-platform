@@ -186,9 +186,11 @@ class AggregateReportPublisher extends HmdaActor with ResourceUtils {
 
   private def getLarSeqFlow(larSeq: Seq[LoanApplicationRegister], msa: Int) = {
     log.info(s"\n\nDOWNLOADED! $msa.txt     \nNumber of LARs is ${larSeq.length}\n")
+    if(larSeq.length > 80000)
+      log.info(s"\n   Too big, skipping\n")
     val larSource: Source[LoanApplicationRegister, NotUsed] = Source.fromIterator(() => larSeq.toIterator)
     val reportFlow = simpleReportFlow2(larSource)
-    val combinations = combine(List(msa), aggregateReports)
+    val combinations = if(larSeq.length > 80000) combine(List(msa), aggregateReports) else combine(List(), List())
 
     Source(combinations).via(reportFlow).via(s3Flow).runWith(Sink.last)
   }
