@@ -33,10 +33,10 @@ object PubSubEventsProtobufConverter {
   }
 
   def generateAggregateReportsToProtobuf(obj: GenerateAggregateReports): GenerateAggregateReportsMessage = {
-    GenerateAggregateReportsMessage()
+    GenerateAggregateReportsMessage(start = obj.start)
   }
   def generateAggregateReportsFromProtobuf(msg: GenerateAggregateReportsMessage): GenerateAggregateReports = {
-    GenerateAggregateReports()
+    GenerateAggregateReports(msg.start)
   }
 
   def generateDisclosureReportsToProtobuf(obj: GenerateDisclosureReports): GenerateDisclosureReportsMessage = {

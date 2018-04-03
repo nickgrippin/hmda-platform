@@ -17,4 +17,6 @@ message GenerateDisclosureReportsMessage {
     SubmissionIdMessage submissionId = 1;
 }
 
-message GenerateAggregateReportsMessage {}
+message GenerateAggregateReportsMessage {
+    int32 start = 1;
+}
