@@ -126,7 +126,7 @@ class AggregateReportPublisher extends HmdaActor with ResourceUtils {
   val s3Flow =
     Flow[AggregateReportPayload]
       .map(payload => {
-        val filePath = s"$environment/reports/aggregate/2017/${payload.msa}/${payload.reportID}.txt"
+        val filePath = s"prod/reports/aggregate/2017/${payload.msa}/${payload.reportID}.txt"
         log.info(s"Publishing Aggregate report. MSA: ${payload.msa}, Report #: ${payload.reportID}")
 
         Source.single(ByteString(payload.report))
