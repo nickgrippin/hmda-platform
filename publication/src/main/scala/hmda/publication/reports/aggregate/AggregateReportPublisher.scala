@@ -6,6 +6,7 @@ import java.util.concurrent.CompletionStage
 
 import akka.NotUsed
 import akka.actor.{ ActorSystem, Props }
+import akka.http.javadsl.model.Uri
 import akka.stream.{ ActorMaterializer, ActorMaterializerSettings, Supervision }
 import akka.stream.Supervision._
 import akka.stream.alpakka.s3.scaladsl.S3Client
@@ -180,19 +181,19 @@ class AggregateReportPublisher extends HmdaActor with ResourceUtils {
     for {
       larSeq <- larSeqF
       s <- getLarSeqFlow(larSeq, msa)
-      t <- s
+      t <- s.getOrElse(Future.apply(MultipartUploadResult(Uri.EMPTY, "", "", "")))
     } yield t
   }
 
   private def getLarSeqFlow(larSeq: Seq[LoanApplicationRegister], msa: Int) = {
     log.info(s"\n\nDOWNLOADED! $msa.txt     \nNumber of LARs is ${larSeq.length}\n")
-    if(larSeq.length > 80000)
+    if (larSeq.length > 80000)
       log.info(s"\n   Too big, skipping\n")
     val larSource: Source[LoanApplicationRegister, NotUsed] = Source.fromIterator(() => larSeq.toIterator)
     val reportFlow = simpleReportFlow2(larSource)
-    val combinations = if(larSeq.length < 80000) combine(List(msa), aggregateReports) else combine(List(), List())
+    val combinations = if (larSeq.length < 80000) combine(List(msa), aggregateReports) else combine(List(), List())
 
-    Source(combinations).via(reportFlow).via(s3Flow).runWith(Sink.last)
+    Source(combinations).via(reportFlow).via(s3Flow).runWith(Sink.lastOption)
   }
 }
 
