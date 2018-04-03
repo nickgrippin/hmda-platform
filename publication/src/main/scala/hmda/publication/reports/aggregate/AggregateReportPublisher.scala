@@ -2,13 +2,13 @@ package hmda.publication.reports.aggregate
 
 import java.io.File
 import java.nio.file.Paths
-import java.util.concurrent.{ CompletionStage, Executors }
+import java.util.concurrent.CompletionStage
 
 import akka.NotUsed
 import akka.actor.{ ActorSystem, Props }
 import akka.stream.{ ActorMaterializer, ActorMaterializerSettings, Supervision }
 import akka.stream.Supervision._
-import akka.stream.alpakka.s3.javadsl.S3Client
+import akka.stream.alpakka.s3.scaladsl.S3Client
 import akka.stream.alpakka.s3.{ MemoryBufferType, S3Settings }
 import akka.stream.scaladsl.{ FileIO, Flow, Framing, Keep, Sink, Source, StreamConverters }
 import akka.util.{ ByteString, Timeout }
@@ -17,20 +17,20 @@ import hmda.persistence.model.HmdaActor
 import akka.stream.alpakka.s3.javadsl.MultipartUploadResult
 import com.typesafe.config.ConfigFactory
 import hmda.census.model.MsaIncomeLookup
+import hmda.model.ResourceUtils
 import hmda.model.fi.lar.LoanApplicationRegister
 import hmda.parser.fi.lar.LarCsvParser
 import hmda.persistence.messages.commands.publication.PublicationCommands.GenerateAggregateReports
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ Await, ExecutionContext, Future }
 import scala.concurrent.duration._
-import scala.util.Try
 
 object AggregateReportPublisher {
   val name = "aggregate-report-publisher"
   def props(): Props = Props(new AggregateReportPublisher)
 }
 
-class AggregateReportPublisher extends HmdaActor {
+class AggregateReportPublisher extends HmdaActor with ResourceUtils {
   val config = ConfigFactory.load()
 
   val decider: Decider = { e =>
@@ -52,13 +52,14 @@ class AggregateReportPublisher extends HmdaActor {
   val secretAccess = config.getString("hmda.publication.aws.secret-access-key ")
   val region = config.getString("hmda.publication.aws.region")
   val bucket = config.getString("hmda.publication.aws.public-bucket")
+  val privateBucket = config.getString("hmda.publication.aws.private-bucket")
   val environment = config.getString("hmda.publication.aws.environment")
 
   val awsCredentials = new AWSStaticCredentialsProvider(
     new BasicAWSCredentials(accessKeyId, secretAccess)
   )
   val awsSettings = new S3Settings(MemoryBufferType, None, awsCredentials, region, false)
-  val s3Client = new S3Client(awsSettings, system, materializer)
+  val s3Client = new S3Client(awsSettings)
 
   val aggregateReports: List[AggregateReport] = List(
     A1, A2,
@@ -98,56 +99,49 @@ class AggregateReportPublisher extends HmdaActor {
     case _ => //do nothing
   }
 
-  private def generateReports = {
-    val byteStringToLarFlow: Flow[ByteString, LoanApplicationRegister, NotUsed] =
-      Flow[ByteString]
-        .map(s => LarCsvParser(s.utf8String) match {
+  val simpleReportFlow: Flow[(Int, AggregateReport), AggregateReportPayload, NotUsed] =
+    Flow[(Int, AggregateReport)].mapAsyncUnordered(4) {
+      case (msa, report) => {
+        val source = s3Source(msa)
+        log.info(s"Calling generate on ${report.getClass.getName} for MSA $msa")
+        report.generate(source, msa)
+      }
+    }
+
+  def simpleReportFlow2(source: Source[LoanApplicationRegister, NotUsed]): Flow[(Int, AggregateReport), AggregateReportPayload, NotUsed] =
+    Flow[(Int, AggregateReport)].mapAsyncUnordered(3) {
+      case (msa, report) => {
+        log.info(s"Calling generate on ${report.getClass.getName} for MSA $msa")
+        report.generate(source, msa)
+      }
+    }
+
+  val byteStringToLarFlow: Flow[ByteString, LoanApplicationRegister, NotUsed] =
+    Flow[ByteString]
+      .map(s =>
+        LarCsvParser(s.utf8String) match {
           case Right(lar) => lar
         })
 
-    val filePath = getClass.getResourceAsStream("2018-03-25_lar.txt")
+  val s3Flow =
+    Flow[AggregateReportPayload]
+      .map(payload => {
+        val filePath = s"$environment/reports/aggregate/2017/${payload.msa}/${payload.reportID}.txt"
+        log.info(s"Publishing Aggregate report. MSA: ${payload.msa}, Report #: ${payload.reportID}")
 
-    val larSourceTry = StreamConverters.fromInputStream(() => filePath)
-
-    val larSource = larSourceTry
-      .via(framing)
-      .viaMat(byteStringToLarFlow)(Keep.none)
-
-    val msaList = MsaIncomeLookup.everyFips.toList
-
-    val combinations = combine(List(-1), nationalAggregateReports)
-
-    val simpleReportFlow: Flow[(Int, AggregateReport), AggregateReportPayload, NotUsed] =
-      Flow[(Int, AggregateReport)].mapAsyncUnordered(5) {
-        case (msa, report) => {
-          log.info(s"Calling generate on ${report.getClass.getName} for MSA $msa")
-          report.generate(larSource, msa)
-        }
-      }
-
-    val s3Flow: Flow[AggregateReportPayload, CompletionStage[MultipartUploadResult], NotUsed] =
-      Flow[AggregateReportPayload]
-        .map(payload => {
-          val filePath = s"$environment/reports/aggregate/2017/${payload.msa}/${payload.reportID}.txt"
-          log.info(s"Publishing Aggregate report. MSA: ${payload.msa}, Report #: ${payload.reportID}")
-
-          Source.single(ByteString(payload.report))
-            .runWith(s3Client.multipartUpload(bucket, filePath))
-        })
-
-    /*val printFlow: Flow[LoanApplicationRegister, LoanApplicationRegister, NotUsed] =
-      Flow[LoanApplicationRegister].take(1).map(lar => {
-        log.info(lar.toCSV)
-        lar
+        Source.single(ByteString(payload.report))
+          .runWith(s3Client.multipartUpload(bucket, filePath))
       })
 
-    val x = larSource.via(printFlow).runWith(Sink.seq)
+  private def generateReports = {
+    val msaList = MsaIncomeLookup.everyFips.toList
 
-    for {
-      y <- x
-    } yield println(y)*/
+    val shortenedList = msaList.drop(10).filterNot(_ == -1)
 
-    Source(combinations).via(simpleReportFlow).via(s3Flow).runWith(Sink.ignore)
+    shortenedList.foreach(msa => {
+      val reports = generateMSAReports2(msa)
+      Await.result(reports, 24.hours)
+    })
   }
 
   /**
@@ -159,5 +153,44 @@ class AggregateReportPublisher extends HmdaActor {
     msas.flatMap(msa => List.fill(reports.length)(msa).zip(reports))
   }
 
+  private def msaToLarSource(msa: Int): Source[LoanApplicationRegister, NotUsed] = {
+    val fileString = if (msa == -1) "2018-03-25_lar.txt" else s"$msa.txt"
+    //val filePath = getClass.getClassLoader.getResourceAsStream(fileString)
+    val filePath = getClass.getClassLoader.getResource(fileString).toURI
+
+    //val larSourceTry = StreamConverters.fromInputStream(() => filePath)
+    val larSourceTry = FileIO.fromPath(Paths.get(filePath))
+
+    larSourceTry
+      .via(framing)
+      .viaMat(byteStringToLarFlow)(Keep.right)
+  }
+
+  def s3Source(msa: Int): Source[LoanApplicationRegister, NotUsed] = {
+    val sourceFileName = s"dev/resources/aggregate/3-25/$msa.txt"
+    s3Client
+      .download(privateBucket, sourceFileName)
+      .via(framing)
+      .via(byteStringToLarFlow)
+  }
+
+  private def generateMSAReports2(msa: Int) = {
+    val larSeqF: Future[Seq[LoanApplicationRegister]] = s3Source(msa).runWith(Sink.seq)
+
+    for {
+      larSeq <- larSeqF
+      s <- getLarSeqFlow(larSeq, msa)
+      t <- s
+    } yield t
+  }
+
+  private def getLarSeqFlow(larSeq: Seq[LoanApplicationRegister], msa: Int) = {
+    log.info(s"\n\nDOWNLOADED! $msa.txt     \nNumber of LARs is ${larSeq.length}\n")
+    val larSource: Source[LoanApplicationRegister, NotUsed] = Source.fromIterator(() => larSeq.toIterator)
+    val reportFlow = simpleReportFlow2(larSource)
+    val combinations = combine(List(msa), aggregateReports)
+
+    Source(combinations).via(reportFlow).via(s3Flow).runWith(Sink.last)
+  }
 }
 

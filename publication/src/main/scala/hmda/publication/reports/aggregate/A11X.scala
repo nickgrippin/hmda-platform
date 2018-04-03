@@ -1,7 +1,7 @@
 package hmda.publication.reports.aggregate
 
 import akka.NotUsed
-import akka.stream.scaladsl.Source
+import akka.stream.scaladsl.{ Sink, Source }
 import hmda.census.model.{ Tract, TractLookup }
 import hmda.model.fi.lar.LoanApplicationRegister
 import hmda.model.publication.reports.EthnicityEnum._
@@ -228,7 +228,7 @@ trait A11X extends AggregateReport {
 
     val msa: String = if (metaData.reportType == Aggregate) s""""msa": ${msaReport(fipsCode.toString).toJsonFormat},""" else ""
     val reportDate = formattedCurrentDate
-    val yearF = calculateYear(lars)
+    val yearF = calculateYear(larSource)
 
     val msaTracts: Set[Tract] =
       if (metaData.reportType == Aggregate) TractLookup.values.filter(_.msa == fipsCode.toString)

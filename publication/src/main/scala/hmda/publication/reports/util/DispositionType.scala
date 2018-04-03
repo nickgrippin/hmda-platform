@@ -21,10 +21,7 @@ sealed abstract class DispositionType(
     for {
       count <- loanCountF
       total <- totalValueF
-    } yield {
-      println(s"Calculated disposition ${this.value} with a count of $count and a total of $total")
-      ValueDisposition(value, count, total)
-    }
+    } yield ValueDisposition(value, count, total)
   }
 
   def calculatePercentageDisposition[ec: EC, mat: MAT, as: AS](larSource: Source[LoanApplicationRegister, NotUsed]): Future[PercentageDisposition] = {
