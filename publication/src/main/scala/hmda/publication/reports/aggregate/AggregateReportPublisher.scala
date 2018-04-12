@@ -62,6 +62,9 @@ class AggregateReportPublisher extends HmdaActor with ResourceUtils {
   val awsSettings = new S3Settings(MemoryBufferType, None, awsCredentials, region, false)
   val s3Client = new S3Client(awsSettings)
 
+  val completedMsas = List(10180, 10380, 10420, 10500, 10540, 10580, 10740, 10780, 10900, 11020, 11100, 11180, 11244, 11260, 11460, 11500, 11540, 11640, 11700, 12020, 12100, 12220, 12260, 12540, 12620, 12700, 12940, 12980, 13020, 13140, 13220, 13380, 13460, 13740, 13780, 13820, 13900, 13980, 14010, 14020, 14100, 14260, 14500, 14540, 14740, 14860, 15180, 15260, 15380, 15500, 15540, 15680, 15940, 15980, 16020, 16060, 16180, 16220, 16300, 16540, 16580, 16620, 16820, 16860, 16940, 17020, 17300, 17420, 17660, 17780, 17860, 17900, 17980, 18020, 18580, 18700, 18880, 19060, 19140, 19180, 19300, 19340, 19380, 19460, 19500, 19660, 19780, 20020, 20100, 20220, 20260, 20500, 20524, 20700, 20740, 20940, 20994, 21060, 21140, 21300, 21340, 21420, 21500, 21660, 21780, 21820, 22020, 22140, 22180, 22220, 22380, 22420, 22500, 22520, 22540, 22660, 22900, 23060, 23420, 23460, 23540, 23580, 23844, 23900, 24020, 24140, 24220, 24260, 24300, 24420, 24500, 24540, 24580, 24660, 24780, 24860, 25020, 25060, 25180, 25220, 25260, 25420, 25500, 25540, 25620, 25860, 25940, 25980, 26140, 26300, 26380, 26580, 26620, 26820, 26980, 27060, 27100, 27140, 27180, 27340, 27500, 27620, 27740, 27780, 27860, 27900, 27980, 28020, 28100, 28420, 28660, 28700, 28740, 28940, 29020, 29100, 29180, 29200, 29340, 29404, 29420, 29460, 29540, 29620, 29700, 29740, 29940, 30020, 30140, 30300, 30340, 30460, 30620, 30700, 30780, 30860, 30980, 31020, 31180, 31340, 31420, 31460, 31540, 31700, 31740, 31860, 31900, 32420, 32580, 32780, 32900, 33140, 33220, 33260, 33540, 33660, 33700, 33740, 33780, 33860, 34060, 34100, 34580, 34620, 34740, 34820, 34900, 34940, 35100, 35300, 35660, 35840, 35980, 36100, 36140, 36220, 36500, 36540, 36780, 36980, 37100, 37340, 37460, 37620, 37860, 37900, 38220, 38340, 38540, 38660, 38860, 38940, 39140, 39340, 39380, 39460, 39540, 39660, 39740, 39820, 39900, 40220, 40340, 40380, 40420, 40484, 40580, 40660, 40980, 41060, 41100, 41140, 41420, 41500, 41540, 41660, 41900, 41980, 42020, 42034, 42100, 42140, 42200, 42220, 42340, 42540, 42680, 42700, 43100, 43300, 43340, 43420, 43580, 43620, 43780, 43900, 44060, 44100, 44140, 44180, 44220, 44300, 44420, 44700, 44940, 45060, 45220, 45460, 45500, 45540, 45780, 45820, 45940, 46140, 46220, 46340, 46520, 46540, 46660, 46700, 47020, 47220, 47300, 47380, 47460, 47580, 47940, 48060, 48140, 48260, 48300, 48540, 48620, 48660, 48700, 48864, 48900, 49020, 49180, 49340, 49420, 49620, 49660, 49700, 49740)
+
+  // 48 + i
   val aggregateReports: List[AggregateReport] = List(
     A1, A2,
     AggregateA1, AggregateA2, AggregateA3,
@@ -77,6 +80,7 @@ class AggregateReportPublisher extends HmdaActor with ResourceUtils {
     A12_1, A12_2
   )
 
+  // 46
   val nationalAggregateReports: List[AggregateReport] = List(
     NationalAggregateA1, NationalAggregateA2, NationalAggregateA3,
     NationalAggregateA4,
@@ -101,7 +105,7 @@ class AggregateReportPublisher extends HmdaActor with ResourceUtils {
   }
 
   val simpleReportFlow: Flow[(Int, AggregateReport), AggregateReportPayload, NotUsed] =
-    Flow[(Int, AggregateReport)].mapAsyncUnordered(4) {
+    Flow[(Int, AggregateReport)].mapAsyncUnordered(2) {
       case (msa, report) => {
         val source = s3Source(msa)
         log.info(s"Calling generate on ${report.getClass.getName} for MSA $msa")
@@ -139,8 +143,12 @@ class AggregateReportPublisher extends HmdaActor with ResourceUtils {
 
     val shortenedList = msaList.drop(start).filterNot(_ == -1)
 
-    shortenedList.foreach(msa => {
-      log.info(s"\nCurrent index is ${msaList.indexOf(msa)}")
+    val uncompletedList = shortenedList.filterNot(completedMsas.contains(_))
+
+    log.info(s"\nUncompleted MSAs: ${uncompletedList.length}")
+
+    uncompletedList.foreach(msa => {
+      log.info(s"\nCurrent index is ${msaList.indexOf(msa)} for the MSA $msa")
       val reports = generateMSAReports2(msa)
       Await.result(reports, 24.hours)
     })
@@ -189,10 +197,10 @@ class AggregateReportPublisher extends HmdaActor with ResourceUtils {
   private def getLarSeqFlow(larSeq: Seq[LoanApplicationRegister], msa: Int) = {
     log.info(s"\n\nDOWNLOADED! $msa.txt     \nNumber of LARs is ${larSeq.length}\n")
     if (larSeq.length > 45000)
-      log.info(s"\n   Too big, skipping\n")
+      log.info(s"\n   Too big\n")
     val larSource: Source[LoanApplicationRegister, NotUsed] = Source.fromIterator(() => larSeq.toIterator)
     val reportFlow = simpleReportFlow2(larSource)
-    val combinations = if (larSeq.length < 45000) combine(List(msa), aggregateReports) else combine(List(), List())
+    val combinations = combine(List(msa), aggregateReports)
 
     Source(combinations).via(reportFlow).via(s3Flow).runWith(Sink.lastOption)
   }
