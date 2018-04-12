@@ -51,12 +51,11 @@ object A1 extends AggregateReport with DispositionProtocol {
            |    "tracts": $tractJson
            |}
          """.stripMargin
-
       AggregateReportPayload(metaData.reportTable, fipsCode.toString, report)
     }
   }
 
-  private def getTracts[ec: EC, mat: MAT, as: AS](source: Source[LoanApplicationRegister, NotUsed]): Future[Set[Tract]] = {
+  private def getTracts[ec: EC, mat: MAT, as: AS](source: Source[LoanApplicationRegister, NotUsed]): Future[List[Tract]] = {
     val fTracts = source.map(lar => {
       TractLookup.values
         .find(t => lar.geography.state == t.state && lar.geography.county == t.county && lar.geography.tract == t.tractDec)
@@ -64,7 +63,7 @@ object A1 extends AggregateReport with DispositionProtocol {
     }).runWith(Sink.seq)
     for {
       t <- fTracts
-    } yield t.toSet
+    } yield t.toSet.toList.filterNot(t => t.tractDec == "")
   }
 
   private def getTractTitle(tract: Tract): String = {
@@ -73,7 +72,7 @@ object A1 extends AggregateReport with DispositionProtocol {
     s"$stateAbbr/${cbsa.countyName}/${tract.tractDec}"
   }
 
-  private def calculateA1TractValues[ec: EC, mat: MAT, as: AS](tracts: Set[Tract], lars: Source[LoanApplicationRegister, NotUsed], dispositions: List[DispositionType]): Future[Set[String]] = {
+  private def calculateA1TractValues[ec: EC, mat: MAT, as: AS](tracts: List[Tract], lars: Source[LoanApplicationRegister, NotUsed], dispositions: List[DispositionType]): Future[List[String]] = {
     Future.sequence(tracts.map(tract => {
       val tractLars = lars.filter(lar =>
         lar.geography.state == tract.state &&
