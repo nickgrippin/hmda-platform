@@ -66,6 +66,7 @@ class AggregateReportPublisher extends HmdaActor with ResourceUtils {
 
   // 48 + i
   val aggregateReports: List[AggregateReport] = List(
+    AI,
     A1, A2,
     AggregateA1, AggregateA2, AggregateA3,
     AggregateA4,
