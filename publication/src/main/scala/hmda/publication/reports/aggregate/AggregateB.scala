@@ -149,7 +149,7 @@ trait AggregateBX extends AggregateReport {
        |
      """.stripMargin
 
-      val fipsString = if (reportId == "DB") fipsCode.toString else "nationwide"
+      val fipsString = if (reportId == "A_B") fipsCode.toString else "nationwide"
 
       AggregateReportPayload(metaData.reportTable, fipsString, report)
     }

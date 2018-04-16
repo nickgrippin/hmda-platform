@@ -63,7 +63,12 @@ object A1 extends AggregateReport with DispositionProtocol {
     }).runWith(Sink.seq)
     for {
       t <- fTracts
-    } yield t.toSet.toList.filterNot(t => t.tractDec == "")
+    } yield {
+      println(s"   Got tracts!")
+      val q = t.toSet.toList.filterNot(t => t.tractDec == "")
+      println(q)
+      q
+    }
   }
 
   private def getTractTitle(tract: Tract): String = {
@@ -89,6 +94,7 @@ object A1 extends AggregateReport with DispositionProtocol {
         val tractTitle = getTractTitle(tract)
         val minPopRounded = Math.round(tract.minorityPopulationPercent).toInt
         val medianIncomeRounded = Math.round(tract.tractMfiPercentageOfMsaMfi).toInt
+        println(s"     Calculated tract value for $tractTitle")
         s"""
            |{
            |  "tract": "$tractTitle",
