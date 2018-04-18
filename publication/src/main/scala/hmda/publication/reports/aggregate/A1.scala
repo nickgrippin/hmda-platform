@@ -56,19 +56,30 @@ object A1 extends AggregateReport with DispositionProtocol {
   }
 
   private def getTracts[ec: EC, mat: MAT, as: AS](source: Source[LoanApplicationRegister, NotUsed]): Future[List[Tract]] = {
-    val fTracts = source.map(lar => {
+    /*val fTracts = source.map(lar => {
       TractLookup.values
         .find(t => lar.geography.state == t.state && lar.geography.county == t.county && lar.geography.tract == t.tractDec)
-        .getOrElse(Tract())
+        .getOrElse())
     }).runWith(Sink.seq)
     for {
       t <- fTracts
     } yield {
       println(s"   Got tracts!")
       val q = t.toSet.toList.filterNot(t => t.tractDec == "")
-      println(q)
+      println("List(")
+      q.foreach(z => {
+        println(s""""${z.state}","${z.county}","${z.tract}","${z.tractDec}","${z.key}","${z.msa}",${z.minorityPopulationPercent},${z.tractMfiPercentageOfMsaMfi},${z.medianYearHomesBuilt}),""")
+      })
+      println(")")
       q
+    }*/
+    var l: List[Tract] = List()
+    for (line <- scala.io.Source.fromResource("tracts_35614.txt").getLines) {
+      val arr = line.split(",").map(_.trim)
+      l = l :+ Tract(arr(0), arr(1), arr(2), arr(3), arr(4), arr(5), arr(6).toDouble, arr(7).toDouble, Some(arr(8).toInt))
     }
+    println(s"Got tracts!  Sample: \n${l.head}")
+    Future(l)
   }
 
   private def getTractTitle(tract: Tract): String = {

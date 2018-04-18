@@ -22,6 +22,7 @@ import hmda.model.ResourceUtils
 import hmda.model.fi.lar.LoanApplicationRegister
 import hmda.parser.fi.lar.LarCsvParser
 import hmda.persistence.messages.commands.publication.PublicationCommands.GenerateAggregateReports
+import hmda.publication.reports.disclosure.A3
 
 import scala.concurrent.{ Await, ExecutionContext, Future }
 import scala.concurrent.duration._
@@ -66,7 +67,8 @@ class AggregateReportPublisher extends HmdaActor with ResourceUtils {
   // 49
   val aggregateReports: List[AggregateReport] = List(
     AI,
-    A1, A2,
+    //A1,
+    A2,
     AggregateA1, AggregateA2, AggregateA3,
     AggregateA4,
     AggregateB,
@@ -78,6 +80,12 @@ class AggregateReportPublisher extends HmdaActor with ResourceUtils {
     A9,
     A11_1, A11_2, A11_3, A11_4, A11_5, A11_6, A11_7, A11_8, A11_9, A11_10,
     A12_1, A12_2
+  )
+
+  val reportMap: Map[Int, List[AggregateReport]] = Map(
+    //47894 -> List(A1),
+    35614 -> List( /*A9,*/ A1)
+  //27620 -> List(A1)
   )
 
   // 46
@@ -143,10 +151,7 @@ class AggregateReportPublisher extends HmdaActor with ResourceUtils {
 
     val shortenedList = msaList.drop(start).filterNot(_ == -1).filterNot(completedMsas.contains(_))
 
-    log.info(s"\nUncompleted MSAs: ${shortenedList.length}")
-
-    shortenedList.foreach(msa => {
-      log.info(s"\nCurrent index is ${msaList.indexOf(msa)} for the MSA $msa")
+    reportMap.keys.foreach(msa => {
       val reports = generateMSAReports2(msa)
       Await.result(reports, 24.hours)
     })
@@ -196,7 +201,7 @@ class AggregateReportPublisher extends HmdaActor with ResourceUtils {
     log.info(s"\n\nDOWNLOADED! $msa.txt     \nNumber of LARs is ${larSeq.length}\n")
     val larSource: Source[LoanApplicationRegister, NotUsed] = Source.fromIterator(() => larSeq.toIterator)
     val reportFlow = simpleReportFlow2(larSource)
-    val combinations = combine(List(msa), List(A1))
+    val combinations = combine(List(msa), reportMap.get(msa).get)
 
     Source(combinations).via(reportFlow).via(s3Flow).runWith(Sink.lastOption)
   }
