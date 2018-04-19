@@ -84,8 +84,8 @@ class AggregateReportPublisher extends HmdaActor with ResourceUtils {
   )
 
   val reportMap: Map[Int, List[AggregateReport]] = Map(
-    //47894 -> List(A1),
-    35614 -> List( /*A9,*/ A1)
+    47894 -> List(A1)
+  //35614 -> List( /*A9,*/ A1)
   //27620 -> List(A1)
   )
 
@@ -151,9 +151,11 @@ class AggregateReportPublisher extends HmdaActor with ResourceUtils {
   private def generateReports(start: Int) = {
     val msaList = MsaIncomeLookup.everyFips.toList
 
-    val shortenedList = msaList.drop(start).filterNot(_ == -1).filterNot(completedMsas.contains(_))
+    //val shortenedList = msaList.drop(start).filterNot(_ == -1).filterNot(completedMsas.contains(_))
+    val shortenedList = msaList.drop(start).filterNot(_ == -1)
 
     reportMap.keys.foreach(msa => {
+      log.info(s"Index is ${msaList.indexOf(msa)}")
       val reports = generateMSAReports2(msa)
       Await.result(reports, 24.hours)
     })
