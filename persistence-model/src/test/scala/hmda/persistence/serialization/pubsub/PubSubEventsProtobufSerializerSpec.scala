@@ -31,7 +31,7 @@ class PubSubEventsProtobufSerializerSpec extends PropSpec with PropertyChecks wi
   }
 
   property("GenerateAggregateReports messages must be serialized to binary and back") {
-    val msg = GenerateAggregateReports()
+    val msg = GenerateAggregateReports(1)
     val protobuf = serializer.toBinary(msg)
     serializer.fromBinary(protobuf, serializer.GenerateAggregateReportsManifest) mustBe msg
   }

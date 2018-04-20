@@ -84,9 +84,7 @@ class AggregateReportPublisher extends HmdaActor with ResourceUtils {
   )
 
   val reportMap: Map[Int, List[AggregateReport]] = Map(
-    47894 -> List(A1)
-  //35614 -> List( /*A9,*/ A1)
-  //27620 -> List(A1)
+    35614 -> List(A1)
   )
 
   // 46

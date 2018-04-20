@@ -31,9 +31,9 @@ class PubSubEventsProtobufConverterSpec extends PropSpec with PropertyChecks wit
   }
 
   property("Generate Aggregate Reports must serialize to protobuf and back") {
-    val generate = GenerateAggregateReports()
+    val generate = GenerateAggregateReports(1)
     val protobuf = generateAggregateReportsToProtobuf(generate).toByteArray
-    generateAggregateReportsFromProtobuf(GenerateAggregateReportsMessage.parseFrom(protobuf)) mustBe GenerateAggregateReports()
+    generateAggregateReportsFromProtobuf(GenerateAggregateReportsMessage.parseFrom(protobuf)) mustBe GenerateAggregateReports(1)
   }
 
   property("Generate Disclosure Reports must serialize to protobuf and back") {
