@@ -58,7 +58,7 @@ class DisclosureReportPublisher extends HmdaActor with LoanApplicationRegisterCa
   mediator ! Subscribe(PubSubTopics.submissionSigned, self)
 
   val duration = config.getInt("hmda.actor.timeout")
-  implicit val timeout = Timeout(duration.seconds)
+  implicit val timeout = Timeout(30.minutes)
 
   val accessKeyId = config.getString("hmda.publication.aws.access-key-id")
   val secretAccess = config.getString("hmda.publication.aws.secret-access-key ")
