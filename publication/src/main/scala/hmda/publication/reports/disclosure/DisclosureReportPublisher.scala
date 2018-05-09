@@ -137,11 +137,11 @@ class DisclosureReportPublisher extends HmdaActor with LoanApplicationRegisterCa
       println(s"msaList: $msas, submission: $subId")
       val larSource: Source[LoanApplicationRegister, NotUsed] = Source.fromIterator(() => larSeq.toIterator)
       println(s"starting nationwide reports for $institutionId")
-      Await.result(generateAndPublish(List(-1), nationwideReports, larSource, institution, msas.toList), 10.minutes)
+      Await.result(generateAndPublish(List(-1), nationwideReports, larSource, institution, msas.toList), 1.hours)
 
       msas.foreach { msa: Int =>
         println(s"starting reports for $institutionId, msa $msa")
-        Await.result(generateAndPublish(List(msa), reports, larSource, institution, msas.toList).map(s => Thread.sleep(1500)), 10.minutes)
+        Await.result(generateAndPublish(List(msa), reports, larSource, institution, msas.toList).map(s => Thread.sleep(1500)), 1.hours)
       }
 
     }
