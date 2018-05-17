@@ -32,10 +32,13 @@ import hmda.model.publication.ReportDetails
 import hmda.parser.fi.lar.{ LarCsvParser, ModifiedLarCsvParser }
 import hmda.persistence.institutions.SubmissionPersistence.GetLatestAcceptedSubmission
 import hmda.persistence.institutions.{ InstitutionPersistence, SubmissionPersistence }
+import hmda.persistence.messages.CommonMessages.Command
 import hmda.persistence.messages.commands.publication.PublicationCommands._
 
 import scala.concurrent.{ Await, Future }
 import scala.concurrent.duration._
+
+case class GenerateDisclosureReportsWithMsa(institutionId: String, msa: Int) extends Command
 
 object DisclosureReportPublisher {
   val name = "disclosure-report-publisher"
@@ -98,8 +101,11 @@ class DisclosureReportPublisher extends HmdaActor with LoanApplicationRegisterCa
 
     case GenerateDisclosureReports2(institutionIds) =>
       institutionIds.foreach { inst =>
-        Await.result(allReportsForInstitution(inst).map(s => Thread.sleep(2000)), 24.hours)
+        Await.result(allReportsForInstitution(inst).map(s => Thread.sleep(2000)), 5.days)
       }
+
+    case GenerateDisclosureReportsWithMsa(institutionId, msa) =>
+      Await.result(allReportsForInstitution(institutionId, msa).map(s => Thread.sleep(2000)), 5.days)
 
     case PublishIndividualReport(institutionId, msa, report) =>
       publishIndividualReport(institutionId, msa, reportsByName(report))
@@ -126,7 +132,7 @@ class DisclosureReportPublisher extends HmdaActor with LoanApplicationRegisterCa
     }
   }
 
-  private def allReportsForInstitution(institutionId: String): Future[Unit] = {
+  private def allReportsForInstitution(institutionId: String, msa: Int = -1): Future[Unit] = {
     val larSeqF: Future[Seq[LoanApplicationRegister]] = s3Source(institutionId).runWith(Sink.seq)
     for {
       institution <- getInstitution(institutionId)
@@ -134,12 +140,17 @@ class DisclosureReportPublisher extends HmdaActor with LoanApplicationRegisterCa
       msas <- getMSAFromIRS(subId)
       larSeq <- larSeqF
     } yield {
-      println(s"msaList: $msas, submission: $subId")
-      val larSource: Source[LoanApplicationRegister, NotUsed] = Source.fromIterator(() => larSeq.toIterator)
-      println(s"starting nationwide reports for $institutionId")
-      Await.result(generateAndPublish(List(-1), nationwideReports, larSource, institution, msas.toList), 1.hours)
+      val msaSection = msas.slice(msas.indexOf(msa), msas.length)
+      val stringMsa = if (msas.indexOf(msa) == -1 && msa != -1)
+        s"\n\nMSA $msa was NOT FOUND\nRunning full list\nmsaList: $msas, submission: $subId\n"
+      else s"msaList: $msaSection, submission: $subId\n"
+      println(stringMsa)
 
-      msas.foreach { msa: Int =>
+      val larSource: Source[LoanApplicationRegister, NotUsed] = Source.fromIterator(() => larSeq.toIterator)
+      println(s"starting nationwide reports for $institutionId, beginning with msa ${msaSection.head}")
+      Await.result(generateAndPublish(List(-1), nationwideReports, larSource, institution, msas.toList), 10.hours)
+
+      msaSection.foreach { msa: Int =>
         println(s"starting reports for $institutionId, msa $msa")
         Await.result(generateAndPublish(List(msa), reports, larSource, institution, msas.toList).map(s => Thread.sleep(1500)), 1.hours)
       }

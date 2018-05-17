@@ -14,6 +14,7 @@ import hmda.api.protocol.processing.ApiErrorProtocol
 import hmda.api.protocol.publication.ReportDetailsProtocol
 import hmda.persistence.messages.commands.publication.PublicationCommands._
 import hmda.persistence.messages.events.pubsub.PubSubEvents.FindDisclosurePublisher
+import hmda.publication.reports.disclosure.GenerateDisclosureReportsWithMsa
 
 import scala.util.{ Failure, Success }
 
@@ -48,6 +49,26 @@ trait PublicationAdminHttpApi extends HmdaCustomDirectives with ApiErrorProtocol
       }
     }
 
+  def disclosureInstitutionMsaPath(publicationSupervisor: ActorRef) =
+    path("disclosure" / Segment / IntNumber) { (instId, msa) =>
+      extractExecutionContext { executor =>
+        implicit val ec = executor
+        timedPost { uri =>
+          val message = for {
+            p <- (publicationSupervisor ? FindDisclosurePublisher()).mapTo[ActorRef]
+          } yield {
+            p ! GenerateDisclosureReportsWithMsa(instId, msa)
+          }
+
+          onComplete(message) {
+            case Success(sub) => complete(ToResponseMarshallable(StatusCodes.OK))
+            case Failure(error) =>
+              completeWithInternalError(uri, error)
+          }
+        }
+      }
+    }
+
   def individualReportPath(publicationSupervisor: ActorRef) =
     path("disclosure" / Segment / Segment / Segment) { (instId, msa, report) =>
       extractExecutionContext { executor =>
@@ -73,6 +94,7 @@ trait PublicationAdminHttpApi extends HmdaCustomDirectives with ApiErrorProtocol
 
   def publicationRoutes(supervisor: ActorRef, publicationSupervisor: ActorRef) =
     disclosureInstitutionsPath(publicationSupervisor) ~
+      disclosureInstitutionMsaPath(publicationSupervisor) ~
       individualReportPath(publicationSupervisor)
 
   /*
