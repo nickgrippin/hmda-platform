@@ -63,6 +63,20 @@ class SourceUtilsSpec extends AsyncWordSpec with MustMatchers with BeforeAndAfte
       calculateMedian(source, loanAmount).map(median => median mustBe 300.0)
     }
 
+    "calculate weighted median" in {
+      val listCheck1: List[(Int, Double)] = List((10, 0.15), (10, 0.1), (20, 0.2), (30, 0.3), (30, 0.25))
+      calculateWeightedMedianHelper(listCheck1) mustBe 0.25
+
+      val listCheck2: List[(Int, Double)] = List((100, 0.11), (100, 0.22))
+      calculateWeightedMedianHelper(listCheck2) mustBe 0.11
+
+      val listCheck3: List[(Int, Double)] = List((40, 0.11), (60, 0.22))
+      calculateWeightedMedianHelper(listCheck3) mustBe 0.22
+
+      val listCheckD: List[(Int, Double)] = List((975, 1.77), (322, 1.86), (165, 1.95), (116, 5.41))
+      calculateWeightedMedianHelper(listCheckD) mustBe 1.77
+    }
+
   }
 
   override def afterAll(): Unit = {
