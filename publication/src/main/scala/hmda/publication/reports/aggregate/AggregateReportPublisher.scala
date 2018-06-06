@@ -8,7 +8,10 @@ import akka.stream.{ ActorMaterializer, ActorMaterializerSettings, Supervision }
 import akka.stream.Supervision._
 import akka.stream.alpakka.s3.javadsl.S3Client
 import akka.stream.alpakka.s3.{ MemoryBufferType, S3Settings }
-import akka.stream.scaladsl.{ Flow, Sink, Source }
+import hmda.parser.fi.lar.LarCsvParser
+import hmda.publication
+import hmda.publication.reports
+//import akka.stream.scaladsl.{ Flow, Sink, Source }
 import akka.util.{ ByteString, Timeout }
 import com.amazonaws.auth.{ AWSStaticCredentialsProvider, BasicAWSCredentials }
 import hmda.persistence.model.HmdaActor
@@ -18,6 +21,7 @@ import hmda.census.model.MsaIncomeLookup
 import hmda.persistence.messages.commands.publication.PublicationCommands.GenerateAggregateReports
 
 import scala.concurrent.duration._
+import scala.io.Source
 
 object AggregateReportPublisher {
   val name = "aggregate-report-publisher"
@@ -86,12 +90,12 @@ class AggregateReportPublisher extends HmdaActor with LoanApplicationRegisterCas
 
     case GenerateAggregateReports() =>
       log.info(s"Generating aggregate reports for 2017 filing year")
-      generateReports
+      generateReportsInMem
 
     case _ => //do nothing
   }
 
-  private def generateReports = {
+  /*private def generateReports = {
     val larSource = readData(1000)
     val msaList = MsaIncomeLookup.everyFips.toList
 
@@ -113,6 +117,20 @@ class AggregateReportPublisher extends HmdaActor with LoanApplicationRegisterCas
         })
 
     Source(combinations).via(simpleReportFlow).via(s3Flow).runWith(Sink.ignore)
+  }*/
+
+  private def generateReportsInMem = {
+    val larSource = Source.fromFile("/Users/grippinn/HMDA/hmda-platform/publication/src/main/resources/2018-03-18_lar.txt").getLines.toList
+    var count = 0
+    val lars = larSource.collect {
+      case l if LarCsvParser(l).isRight => {
+        count = count + 1
+        if (count % 100000 == 0) println(s"Count is $count")
+        LarCsvParser(l).right.get
+      }
+    }
+    println("\n\nLENGTH\n")
+    println(lars.length)
   }
 
   /**
@@ -120,9 +138,9 @@ class AggregateReportPublisher extends HmdaActor with LoanApplicationRegisterCas
    * Input:   List(407, 508) and List(A41, A42)
    * Returns: List((407, A41), (407, A42), (508, A41), (508, A42))
    */
-  private def combine(msas: List[Int], reports: List[AggregateReport]): List[(Int, AggregateReport)] = {
-    msas.flatMap(msa => List.fill(reports.length)(msa).zip(reports))
-  }
+  /*private def combine(msas: List[Int], reports: List[AggregateReport]): List[(Int, AggregateReport)] = {
+    msas.flatMap(msa => List.fill(publication.reports.length)(msa).zip(reports))
+  }*/
 
 }
 

@@ -263,7 +263,7 @@ lazy val publication = (project in file("publication"))
           oldStrategy(x)
       },
       parallelExecution in Test := true,
-      libraryDependencies ++= akkaPersistenceDeps ++ Seq(akkaHttpJson)
+      libraryDependencies ++= akkaPersistenceDeps ++ slickDeps ++ Seq(akkaHttpJson)
     )
   ).dependsOn(query % "compile->compile;test->test")
    .dependsOn(persistence % "compile->compile;test->test")

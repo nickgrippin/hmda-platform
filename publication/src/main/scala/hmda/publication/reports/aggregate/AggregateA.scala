@@ -7,6 +7,7 @@ import hmda.model.publication.reports.ReportTypeEnum.Aggregate
 import hmda.publication.reports._
 import hmda.publication.reports.util.ReportUtil._
 import hmda.publication.reports.util.LoanTypeUtil._
+import hmda.publication.reports.util.LoanTypeUtilDB._
 import hmda.publication.reports.util.ReportsMetaDataLookup
 
 import scala.concurrent.Future
@@ -38,8 +39,7 @@ object AggregateA3 extends AggregateAX {
 object NationalAggregateA1 extends AggregateAX {
   val reportId = "N_A1"
   def filters(lar: LoanApplicationRegister): Boolean = {
-    (1 to 4).contains(lar.loan.loanType) &&
-      lar.loan.propertyType == 1
+    lar.loan.propertyType == 1
   }
 }
 
@@ -143,5 +143,73 @@ trait AggregateAX extends AggregateReport {
 
       AggregateReportPayload(metaData.reportTable, fipsString, report)
     }
+  }
+
+  def generateList(larSource: List[LoanApplicationRegister]): AggregateReportPayload = {
+
+    val metaData = ReportsMetaDataLookup.values(reportId)
+
+    val lars = larSource.filter(filters)
+
+    val msa: String = ""
+    val reportDate = formattedCurrentDate
+
+    val received = loanTypesList(lars.filter(lar => (1 to 5).contains(lar.actionTakenType)))
+    val originiated = loanTypesList(lars.filter(lar => lar.actionTakenType == 1))
+    val appNotAcc = loanTypesList(lars.filter(lar => lar.actionTakenType == 2))
+    val denied = loanTypesList(lars.filter(lar => lar.actionTakenType == 3))
+    val withdrawn = loanTypesList(lars.filter(lar => lar.actionTakenType == 4))
+    val closed = loanTypesList(lars.filter(lar => lar.actionTakenType == 5))
+    val preapproval = loanTypesList(lars.filter(lar => lar.actionTakenType == 1 && lar.preapprovals == 1))
+    val sold = loanTypesList(lars.filter(lar => (1 to 9).contains(lar.purchaserType)))
+
+    val report = s"""
+                    |{
+                    |    "table": "${metaData.reportTable}",
+                    |    "type": "${metaData.reportType}",
+                    |    "description": "${metaData.description}",
+                    |    "year": "2017",
+                    |    "reportDate": "$reportDate",
+                    |    "dispositions": [
+                    |        {
+                    |            "disposition": "Applications Received",
+                    |            "loanTypes": $received
+                    |        },
+                    |        {
+                    |            "disposition": "Loans Originated",
+                    |            "loanTypes": $originiated
+                    |        },
+                    |        {
+                    |            "disposition": "Apps. Approved But Not Accepted",
+                    |            "loanTypes": $appNotAcc
+                    |        },
+                    |        {
+                    |            "disposition": "Applications Denied",
+                    |            "loanTypes": $denied
+                    |        },
+                    |        {
+                    |            "disposition": "Applications Withdrawn",
+                    |            "loanTypes": $withdrawn
+                    |        },
+                    |        {
+                    |            "disposition": "Files Closed For Incompleteness",
+                    |            "loanTypes": $closed
+                    |        },
+                    |        {
+                    |            "disposition": "Preapprovals Resulting in Originations",
+                    |            "loanTypes": $preapproval
+                    |        },
+                    |        {
+                    |            "disposition": "Loans Sold",
+                    |            "loanTypes": $sold
+                    |        }
+                    |    ]
+                    |}
+     """.stripMargin
+
+    val fipsString = "nationwide"
+
+    AggregateReportPayload(metaData.reportTable, fipsString, report)
+
   }
 }
