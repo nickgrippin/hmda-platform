@@ -82,7 +82,7 @@ class DisclosureReportPublisher extends HmdaActor with LoanApplicationRegisterCa
     D51, D52, D53, D54, D56, D57,
     D71, D72, D73, D74, D75, D76, D77,
     D81, D82, D83, D84, D85, D86, D87,
-    D11_1, D11_2, D11_3, D11_4, D11_5, D11_6, D11_7, D11_8, D11_9, D11_10,
+    //D11_1, D11_2, D11_3, D11_4, D11_5, D11_6, D11_7, D11_8, D11_9, D11_10,
     D12_2,
     A1, A2, A3,
     A4W,
@@ -147,12 +147,14 @@ class DisclosureReportPublisher extends HmdaActor with LoanApplicationRegisterCa
       println(stringMsa)
 
       val larSource: Source[LoanApplicationRegister, NotUsed] = Source.fromIterator(() => larSeq.toIterator)
-      println(s"starting nationwide reports for $institutionId, beginning with msa ${msaSection.head}")
-      Await.result(generateAndPublish(List(-1), nationwideReports, larSource, institution, msas.toList), 10.hours)
+      if (msa == -1 && msas.indexOf(msa) != -1) {
+        println(s"starting nationwide reports for $institutionId, beginning with msa ${msaSection.head}")
+        Await.result(generateAndPublish(List(-1), nationwideReports, larSource, institution, msas.toList), 10.hours)
+      }
 
       msaSection.foreach { msa: Int =>
         println(s"starting reports for $institutionId, msa $msa")
-        Await.result(generateAndPublish(List(msa), reports, larSource, institution, msas.toList).map(s => Thread.sleep(1500)), 1.hours)
+        Await.result(generateAndPublish(List(msa), reports, larSource, institution, msas.toList).map(s => Thread.sleep(1500)), 24.hours)
       }
 
     }
