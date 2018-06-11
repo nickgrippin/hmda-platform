@@ -2,7 +2,7 @@ package hmda.publication
 
 import hmda.parser.fi.lar.LarCsvParser
 import hmda.publication.model._
-import hmda.publication.reports.aggregate.{ NationalAggregateA1, NationalAggregateA2 }
+import hmda.publication.reports.aggregate.{ NationalAggregateA1, NationalAggregateA2, NationalAggregateA3 }
 import slick.jdbc.PostgresProfile.api._
 
 import scala.concurrent.{ Await, ExecutionContext }
@@ -15,7 +15,7 @@ object NationalAggregateGenerator {
   val lars = TableQuery[LARTable]
 
   def main(args: Array[String]): Unit = {
-    val report = Await.result(NationalAggregateA2.generate(lars, -1), 5.hours)
+    val report = Await.result(NationalAggregateA1.generate(lars, -1), 5.hours)
     println(s"Finished!\n\n${report.report}")
     Thread.sleep(10000)
     db.close()

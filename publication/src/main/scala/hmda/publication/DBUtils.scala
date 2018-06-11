@@ -19,12 +19,16 @@ trait DBUtils {
     db.run(q)
   }
 
-  /*
-  def sum[T: AS: MAT](input: Source[T, NotUsed], summation: T => Int): Future[Int] = {
-    input.runWith(sinkSum(summation))
+
+  def sum[ec: EC](input: Query[LARTable, LARTable#TableElementType, Seq]): Future[Int] = {
+    val q = for {
+      r <- Compiled(input.map(_.loanAmount).sum).result
+    } yield r
+    db.run(q).map(opt => opt.getOrElse(-1))
   }
 
 
+  /*
   def sumDouble[T: AS: MAT](input: Source[T, NotUsed], summation: T => Double): Future[Double] = {
     input.runWith(sinkSumDouble(summation))
   }
