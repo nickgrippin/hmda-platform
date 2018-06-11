@@ -1,9 +1,7 @@
 package hmda.publication
 
-import hmda.model.fi.lar.LoanApplicationRegister
 import hmda.parser.fi.lar.LarCsvParser
 import hmda.publication.model._
-import hmda.publication.reports.aggregate.NationalAggregateA1
 import slick.jdbc.PostgresProfile.api._
 
 import scala.concurrent.Await
@@ -13,7 +11,7 @@ import scala.io.Source
 object NationalAggregateGenerator {
 
   def main(args: Array[String]): Unit = {
-    val larSource = Source.fromFile("/Users/grippinn/HMDA/hmda-platform/publication/src/main/resources/2018-03-18_lar.txt").getLines.slice(3500001, 4500001).toList
+    val larSource = Source.fromFile("/Users/grippinn/HMDA/hmda-platform/publication/src/main/resources/2018-03-18_lar.txt").getLines.slice(4500000, 6500001).toList
     val db = Database.forConfig("database")
     val lars = TableQuery[LARTable]
     //Await.result(db.run(lars.schema.create), 1.minute)
@@ -32,7 +30,7 @@ object NationalAggregateGenerator {
         lar.actionTakenType, lar.actionTakenDate, geographyQuery,
         applicantQuery, lar.purchaserType, denialQuery,
         lar.rateSpread, lar.hoepaStatus, lar.lienStatus)
-      val insert = Await.result(
+      Await.result(
         db.run(
           DBIO.seq(
             lars.insertOrUpdate(larQuery)

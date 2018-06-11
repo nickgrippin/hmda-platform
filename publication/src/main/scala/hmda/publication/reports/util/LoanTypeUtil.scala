@@ -3,18 +3,20 @@ package hmda.publication.reports.util
 import akka.NotUsed
 import akka.stream.scaladsl.Source
 import hmda.model.fi.lar.LoanApplicationRegister
+import hmda.publication.model.LARTable
 import hmda.publication.reports._
 import hmda.util.SourceUtils
 
 import scala.concurrent.Future
+import slick.jdbc.PostgresProfile.api._
 
 object LoanTypeUtil extends SourceUtils {
-  def loanTypes[ec: EC, mat: MAT, as: AS](larSource: Source[LoanApplicationRegister, NotUsed]): Future[String] = {
+  def loanTypes[ec: EC, mat: MAT, as: AS](query: Query[LARTable, LARTable#TableElementType, Seq]): Future[String] = {
     for {
-      conv <- purposesOutput(larSource.filter(lar => lar.loan.loanType == 1))
-      fha <- purposesOutput(larSource.filter(lar => lar.loan.loanType == 2))
-      va <- purposesOutput(larSource.filter(lar => lar.loan.loanType == 3))
-      fsa <- purposesOutput(larSource.filter(lar => lar.loan.loanType == 4))
+      conv <- purposesOutput(query.filter(lar => lar.loanType === 1))
+      fha <- purposesOutput(query.filter(lar => lar.loanType === 2))
+      va <- purposesOutput(query.filter(lar => lar.loanType === 3))
+      fsa <- purposesOutput(query.filter(lar => lar.loanType === 4))
     } yield {
       s"""
          |[
@@ -39,7 +41,7 @@ object LoanTypeUtil extends SourceUtils {
     }
   }
 
-  private def purposesOutput[ec: EC, mat: MAT, as: AS](larSource: Source[LoanApplicationRegister, NotUsed]): Future[String] = {
+  private def purposesOutput[ec: EC, mat: MAT, as: AS](query: Query[LARTable, LARTable#TableElementType, Seq]): Future[String] = {
     for {
       homePurchaseFirst <- count(larSource.filter(lar => lar.lienStatus == 1 && lar.loan.purpose == 1))
       homePurchaseJunior <- count(larSource.filter(lar => lar.lienStatus == 2 && lar.loan.purpose == 1))
