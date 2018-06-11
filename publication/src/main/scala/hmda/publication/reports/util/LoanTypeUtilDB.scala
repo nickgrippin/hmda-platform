@@ -1,59 +1,54 @@
 package hmda.publication.reports.util
 
-import hmda.model.fi.lar.LoanApplicationRegister
+import hmda.publication.DBUtils
+import hmda.publication.model.LARTable
 import hmda.publication.reports._
-import hmda.util.SourceUtils
 
 import scala.concurrent.Future
+import slick.jdbc.PostgresProfile.api._
 
-object LoanTypeUtilDB extends SourceUtils {
-  def loanTypesList(larSource: List[LoanApplicationRegister]): String = {
-    println("Calling loan types")
-    val conv = purposesOutputList(larSource.filter(lar => lar.loan.loanType == 1))
-    val fha = purposesOutputList(larSource.filter(lar => lar.loan.loanType == 2))
-    val va = purposesOutputList(larSource.filter(lar => lar.loan.loanType == 3))
-    val fsa = purposesOutputList(larSource.filter(lar => lar.loan.loanType == 4))
-
-    s"""
-       |[
-       |  {
-       |    "loanType": "Conventional",
-       |    "purposes": $conv
-       |  },
-       |  {
-       |    "loanType": "FHA",
-       |    "purposes": $fha
-       |  },
-       |  {
-       |    "loanType": "VA",
-       |    "purposes": $va
-       |  },
-       |  {
-       |    "loanType": "FSA/RHS",
-       |    "purposes": $fsa
-       |  }
-       |]
-   """.stripMargin
+object LoanTypeUtilDB extends DBUtils {
+  def loanTypes[ec: EC, mat: MAT, as: AS](query: Query[LARTable, LARTable#TableElementType, Seq]): Future[String] = {
+    for {
+      conv <- purposesOutput(query.filter(lar => lar.loanType === 1))
+      fha <- purposesOutput(query.filter(lar => lar.loanType === 2))
+      va <- purposesOutput(query.filter(lar => lar.loanType === 3))
+      fsa <- purposesOutput(query.filter(lar => lar.loanType === 4))
+    } yield {
+      s"""
+         |[
+         |  {
+         |    "loanType": "Conventional",
+         |    "purposes": $conv
+         |  },
+         |  {
+         |    "loanType": "FHA",
+         |    "purposes": $fha
+         |  },
+         |  {
+         |    "loanType": "VA",
+         |    "purposes": $va
+         |  },
+         |  {
+         |    "loanType": "FSA/RHS",
+         |    "purposes": $fsa
+         |  }
+         |]
+     """.stripMargin
+    }
   }
 
-  private def purposesOutputList(larSource: List[LoanApplicationRegister]): String = {
-    println("Calling Purposes Output")
-    val homePurchaseFirst = larSource.count(lar => lar.lienStatus == 1 && lar.loan.purpose == 1)
-    println(s"HPF: $homePurchaseFirst")
-    val homePurchaseJunior = larSource.count(lar => lar.lienStatus == 2 && lar.loan.purpose == 1)
-    println(s"HPJ: $homePurchaseJunior")
-    val refinanceFirst = larSource.count(lar => lar.lienStatus == 1 && lar.loan.purpose == 3)
-    println(s"RF: $refinanceFirst")
-    val refinanceJunior = larSource.count(lar => lar.lienStatus == 2 && lar.loan.purpose == 3)
-    println(s"RJ: $refinanceJunior")
-    val homeImprovementFirst = larSource.count(lar => lar.lienStatus == 1 && lar.loan.purpose == 2)
-    println(s"HIF: $homeImprovementFirst")
-    val homeImprovementJunior = larSource.count(lar => lar.lienStatus == 2 && lar.loan.purpose == 2)
-    println(s"HIJ: $homeImprovementJunior")
-    val homeImprovementNo = larSource.count(lar => lar.lienStatus != 1 && lar.lienStatus != 2 && lar.loan.purpose == 2)
-    println(s"HIN: $homeImprovementNo")
-
-    val s = s"""
+  private def purposesOutput[ec: EC, mat: MAT, as: AS](query: Query[LARTable, LARTable#TableElementType, Seq]): Future[String] = {
+    for {
+      homePurchaseFirst <- count(query.filter(lar => lar.lienStatus === 1 && lar.loanPurpose === 1))
+      homePurchaseJunior <- count(query.filter(lar => lar.lienStatus === 2 && lar.loanPurpose === 1))
+      refinanceFirst <- count(query.filter(lar => lar.lienStatus === 1 && lar.loanPurpose === 3))
+      refinanceJunior <- count(query.filter(lar => lar.lienStatus === 2 && lar.loanPurpose === 3))
+      homeImprovementFirst <- count(query.filter(lar => lar.lienStatus === 1 && lar.loanPurpose === 2))
+      homeImprovementJunior <- count(query.filter(lar => lar.lienStatus === 2 && lar.loanPurpose === 2))
+      homeImprovementNo <- count(query.filter(lar => lar.lienStatus =!= 1 && lar.lienStatus =!= 2 && lar.loanPurpose === 2))
+    } yield {
+      s"""
          |[
          |  {
          |    "purpose": "Home Purchase",
@@ -73,7 +68,6 @@ object LoanTypeUtilDB extends SourceUtils {
          |  }
          |]
      """.stripMargin
-    println(s)
-    s
+    }
   }
 }

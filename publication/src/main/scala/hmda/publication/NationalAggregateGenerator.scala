@@ -9,11 +9,11 @@ import scala.concurrent.duration._
 import scala.io.Source
 
 object NationalAggregateGenerator {
+  val db = Database.forConfig("database")
+  val lars = TableQuery[LARTable]
 
   def main(args: Array[String]): Unit = {
     val larSource = Source.fromFile("/Users/grippinn/HMDA/hmda-platform/publication/src/main/resources/2018-03-18_lar.txt").getLines.slice(4500000, 6500001).toList
-    val db = Database.forConfig("database")
-    val lars = TableQuery[LARTable]
     //Await.result(db.run(lars.schema.create), 1.minute)
     //println("Schema created")
     var count = 0

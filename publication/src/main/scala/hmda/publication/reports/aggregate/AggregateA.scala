@@ -7,7 +7,7 @@ import hmda.model.publication.reports.ReportTypeEnum.Aggregate
 import hmda.publication.model.LARTable
 import hmda.publication.reports._
 import hmda.publication.reports.util.ReportUtil._
-import hmda.publication.reports.util.LoanTypeUtil._
+import hmda.publication.reports.util.LoanTypeUtilDB._
 import hmda.publication.reports.util.ReportsMetaDataLookup
 
 import scala.concurrent.Future
@@ -39,16 +39,16 @@ object AggregateA3 extends AggregateAX {
 
 object NationalAggregateA1 extends AggregateAX {
   val reportId = "N_A1"
-  def filters(lar: TableQuery[LARTable])= {
-    lar.filter(l => (l.loanType inSet(1 to 4)) &&
-      lar.filter(l => l.loanPropertyType === 1)
+  def filters(lar: TableQuery[LARTable]) = {
+    lar.filter(l => (l.loanType inSet (1 to 4)) &&
+      l.loanPropertyType === 1)
   }
 }
 
 object NationalAggregateA2 extends AggregateAX {
   val reportId = "N_A2"
   def filters(lar: TableQuery[LARTable]) = {
-    lar.filter(l => (l.loanType inSet(1 to 4)) &&
+    lar.filter(l => (l.loanType inSet (1 to 4)) &&
       l.loanPropertyType === 2)
   }
 }
@@ -56,12 +56,12 @@ object NationalAggregateA2 extends AggregateAX {
 object NationalAggregateA3 extends AggregateAX {
   val reportId = "N_A3"
   def filters(lar: TableQuery[LARTable]) = {
-    lar.filter(l => (l.loanType inSet(1 to 4)) &&
+    lar.filter(l => (l.loanType inSet (1 to 4)) &&
       l.loanPropertyType === 3)
   }
 }
 
-trait AggregateAX extends AggregateReport {
+trait AggregateAX extends AggregateReportDB {
   val reportId: String
   def filters(lar: TableQuery[LARTable]): Query[LARTable, LARTable#TableElementType, Seq]
 
@@ -81,14 +81,14 @@ trait AggregateAX extends AggregateReport {
     val reportDate = formattedCurrentDate
 
     for {
-      received <- loanTypes(lars.filter(lar => (1 to 5).contains(lar.actionTakenType)))
+      received <- loanTypes(lars.filter(lar => lar.actionTakenType inSet (1 to 5)))
       originiated <- loanTypes(lars.filter(lar => lar.actionTakenType === 1))
       appNotAcc <- loanTypes(lars.filter(lar => lar.actionTakenType === 2))
       denied <- loanTypes(lars.filter(lar => lar.actionTakenType === 3))
       withdrawn <- loanTypes(lars.filter(lar => lar.actionTakenType === 4))
       closed <- loanTypes(lars.filter(lar => lar.actionTakenType === 5))
       preapproval <- loanTypes(lars.filter(lar => lar.actionTakenType === 1 && lar.preapprovals === 1))
-      sold <- loanTypes(lars.filter(lar => (1 to 9).contains(lar.purchaserType)))
+      sold <- loanTypes(lars.filter(lar => lar.purchaserType inSet (1 to 9)))
     } yield {
       val report = s"""
                       |{
