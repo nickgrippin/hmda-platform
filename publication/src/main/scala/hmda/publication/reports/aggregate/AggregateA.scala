@@ -69,7 +69,7 @@ trait AggregateAX extends AggregateReportDB {
     lar.geography.msa != "NA" &&
       lar.geography.msa.toInt == fips
 
-  def generate[ec: EC, mat: MAT, as: AS](
+  def generate[ec: EC](
     larSource: TableQuery[LARTable],
     fipsCode: Int
   ): Future[AggregateReportPayload] = {

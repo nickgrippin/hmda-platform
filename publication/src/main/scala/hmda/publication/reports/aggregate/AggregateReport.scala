@@ -32,7 +32,7 @@ trait AggregateReportDB {
 
   val reportType: ReportTypeEnum = Aggregate
 
-  def generate[ec: EC, mat: MAT, as: AS](
+  def generate[ec: EC](
     larSource: TableQuery[LARTable],
     fipsCode: Int
   ): Future[AggregateReportPayload]

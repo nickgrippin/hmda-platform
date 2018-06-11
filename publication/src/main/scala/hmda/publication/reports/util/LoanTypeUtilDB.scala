@@ -8,7 +8,7 @@ import scala.concurrent.Future
 import slick.jdbc.PostgresProfile.api._
 
 object LoanTypeUtilDB extends DBUtils {
-  def loanTypes[ec: EC, mat: MAT, as: AS](query: Query[LARTable, LARTable#TableElementType, Seq]): Future[String] = {
+  def loanTypes[ec: EC](query: Query[LARTable, LARTable#TableElementType, Seq]): Future[String] = {
     for {
       conv <- purposesOutput(query.filter(lar => lar.loanType === 1))
       fha <- purposesOutput(query.filter(lar => lar.loanType === 2))
@@ -38,7 +38,7 @@ object LoanTypeUtilDB extends DBUtils {
     }
   }
 
-  private def purposesOutput[ec: EC, mat: MAT, as: AS](query: Query[LARTable, LARTable#TableElementType, Seq]): Future[String] = {
+  private def purposesOutput[ec: EC](query: Query[LARTable, LARTable#TableElementType, Seq]): Future[String] = {
     for {
       homePurchaseFirst <- count(query.filter(lar => lar.lienStatus === 1 && lar.loanPurpose === 1))
       homePurchaseJunior <- count(query.filter(lar => lar.lienStatus === 2 && lar.loanPurpose === 1))

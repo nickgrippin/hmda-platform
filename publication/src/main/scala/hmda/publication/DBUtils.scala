@@ -12,7 +12,7 @@ import hmda.publication.NationalAggregateGenerator._
 
 trait DBUtils {
 
-  def count[ec: EC, T: AS: MAT](input: Query[LARTable, LARTable#TableElementType, Seq]): Future[Int] = {
+  def count[ec: EC](input: Query[LARTable, LARTable#TableElementType, Seq]): Future[Int] = {
     val q = for {
       r <- Compiled(input.length).result
     } yield r

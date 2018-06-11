@@ -2,17 +2,27 @@ package hmda.publication
 
 import hmda.parser.fi.lar.LarCsvParser
 import hmda.publication.model._
+import hmda.publication.reports.aggregate.{ NationalAggregateA1, NationalAggregateA2 }
 import slick.jdbc.PostgresProfile.api._
 
-import scala.concurrent.Await
+import scala.concurrent.{ Await, ExecutionContext }
 import scala.concurrent.duration._
 import scala.io.Source
 
 object NationalAggregateGenerator {
+  implicit val ec = ExecutionContext.global
   val db = Database.forConfig("database")
   val lars = TableQuery[LARTable]
 
   def main(args: Array[String]): Unit = {
+    val report = Await.result(NationalAggregateA2.generate(lars, -1), 5.hours)
+    println(s"Finished!\n\n${report.report}")
+    Thread.sleep(10000)
+    db.close()
+    //val report = NationalAggregateA1.generateList(lars2)
+  }
+
+  def loadData() = {
     val larSource = Source.fromFile("/Users/grippinn/HMDA/hmda-platform/publication/src/main/resources/2018-03-18_lar.txt").getLines.slice(4500000, 6500001).toList
     //Await.result(db.run(lars.schema.create), 1.minute)
     //println("Schema created")
@@ -40,9 +50,5 @@ object NationalAggregateGenerator {
       count += 1
       if (count % 100000 == 0) println(s"Count : $count")
     })
-    println("Finished!")
-    Thread.sleep(10000)
-    db.close()
-    //val report = NationalAggregateA1.generateList(lars2)
   }
 }
