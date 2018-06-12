@@ -1,11 +1,11 @@
-package hmda.publication.reports.util
+package hmda.publication.reports.util.db
 
 import hmda.publication.DBUtils
 import hmda.publication.model.LARTable
 import hmda.publication.reports._
+import slick.jdbc.PostgresProfile.api._
 
 import scala.concurrent.Future
-import slick.jdbc.PostgresProfile.api._
 
 object LoanTypeUtilDB extends DBUtils {
   def loanTypes[ec: EC](query: Query[LARTable, LARTable#TableElementType, Seq]): Future[String] = {

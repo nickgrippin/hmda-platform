@@ -1,8 +1,10 @@
 package hmda.publication
 
+import hmda.census.model.{ MsaIncome, MsaIncomeLookup, TractLookup }
 import hmda.parser.fi.lar.LarCsvParser
 import hmda.publication.model._
 import hmda.publication.reports.aggregate.{ NationalAggregateA1, NationalAggregateA2, NationalAggregateA3 }
+import hmda.publication.reports.util.CensusTractUtil
 import slick.jdbc.PostgresProfile.api._
 
 import scala.concurrent.{ Await, ExecutionContext }
@@ -13,6 +15,7 @@ object NationalAggregateGenerator {
   implicit val ec = ExecutionContext.global
   val db = Database.forConfig("database")
   val lars = TableQuery[LARTable]
+  val tracts = TableQuery[TractTable]
 
   def main(args: Array[String]): Unit = {
     val report = Await.result(NationalAggregateA1.generate(lars, -1), 5.hours)
@@ -22,7 +25,7 @@ object NationalAggregateGenerator {
     //val report = NationalAggregateA1.generateList(lars2)
   }
 
-  def loadData() = {
+  def loadLarData() = {
     val larSource = Source.fromFile("/Users/grippinn/HMDA/hmda-platform/publication/src/main/resources/2018-03-18_lar.txt").getLines.slice(4500000, 6500001).toList
     //Await.result(db.run(lars.schema.create), 1.minute)
     //println("Schema created")
@@ -49,6 +52,29 @@ object NationalAggregateGenerator {
       )
       count += 1
       if (count % 100000 == 0) println(s"Count : $count")
+    })
+  }
+
+  def loadTractData = {
+    val msas = MsaIncomeLookup.values
+    val tractLookup = TractLookup.values
+    var count = 0
+    tractLookup.foreach(tract => {
+      val msa = msas.find(m => m.fips == tract.msa.toInt).getOrElse(MsaIncome())
+      val query = TractQuery(
+        s"${tract.msa}-${tract.state}:${tract.county}:${tract.tract}",
+        tract.msa.toInt,
+        tract.state.toInt,
+        tract.county.toInt,
+        tract.tract.toInt,
+        tract.minorityPopulationPercent,
+        tract.tractMfiPercentageOfMsaMfi,
+        2015 - tract.medianYearHomesBuilt.getOrElse(2016),
+        msa.income
+      )
+      Await.result(db.run(tracts.insertOrUpdate(query)), 1.minutes)
+      count += 1
+      if (count % 10000 == 0) println(count)
     })
   }
 }

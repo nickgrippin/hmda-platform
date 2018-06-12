@@ -1,14 +1,12 @@
 package hmda.publication.reports.aggregate
 
-import akka.NotUsed
-import akka.stream.scaladsl.Source
 import hmda.model.fi.lar.LoanApplicationRegister
 import hmda.model.publication.reports.ReportTypeEnum.Aggregate
 import hmda.publication.model.LARTable
 import hmda.publication.reports._
 import hmda.publication.reports.util.ReportUtil._
-import hmda.publication.reports.util.LoanTypeUtilDB._
 import hmda.publication.reports.util.ReportsMetaDataLookup
+import hmda.publication.reports.util.db.LoanTypeUtilDB._
 
 import scala.concurrent.Future
 import slick.jdbc.PostgresProfile.api._

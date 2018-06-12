@@ -10,17 +10,20 @@ import hmda.model.publication.reports.ApplicantIncomeEnum._
 import hmda.model.publication.reports.MinorityStatusEnum._
 import hmda.model.publication.reports.RaceEnum._
 import hmda.model.publication.reports.ReportTypeEnum.{ Aggregate, NationalAggregate }
+import hmda.publication.model.LARTable
 import hmda.publication.reports.{ AS, EC, MAT }
-import hmda.publication.reports.util.DispositionType._
-import hmda.publication.reports.util.EthnicityUtil.filterEthnicity
-import hmda.publication.reports.util.GenderUtil.filterGender
-import hmda.publication.reports.util.MinorityStatusUtil.filterMinorityStatus
-import hmda.publication.reports.util.RaceUtil.filterRace
-import hmda.publication.reports.util.ReportUtil._
+import hmda.publication.reports.util.db.EthnicityUtilDB._
+import hmda.publication.reports.util.db.MinorityStatusUtilDB.filterMinorityStatus
+import hmda.publication.reports.util.db.RaceUtilDB.filterRace
+import hmda.publication.reports.util.db.ReportUtilDB._
 import hmda.publication.reports.util.ReportsMetaDataLookup
+import hmda.publication.reports.util.db.DispositionTypeDB._
+import hmda.publication.reports.util.db.GenderUtilDB._
 
 import scala.concurrent.Future
+import slick.jdbc.PostgresProfile.api._
 
+/*
 object A41 extends A4X {
   override val reportId: String = "A41"
   override def filters(lar: LoanApplicationRegister): Boolean = {
@@ -70,90 +73,80 @@ object A47 extends A4X {
     List(1, 2, 3).contains(lar.loan.purpose) &&
       lar.loan.propertyType == 2
   }
-}
+}*/
 
 object N41 extends A4X {
   override val reportId: String = "N41"
-  override def filters(lar: LoanApplicationRegister): Boolean = {
-    List(2, 3, 4).contains(lar.loan.loanType) &&
-      List(1, 2).contains(lar.loan.propertyType) &&
-      lar.loan.purpose == 1
+  def filters(lars: TableQuery[LARTable]) = {
+    lars.filter(lar => (lar.loanType inSet (2 to 4)) &&
+      (lar.loanPropertyType inSet (1 to 2)) &&
+      lar.loanPurpose === 1)
   }
 }
 object N42 extends A4X {
   override val reportId: String = "N42"
-  override def filters(lar: LoanApplicationRegister): Boolean = {
-    val loan = lar.loan
-    loan.loanType == 1 && loan.purpose == 1 &&
-      List(1, 2).contains(loan.propertyType)
+  override def filters(lars: TableQuery[LARTable]) = {
+    lars.filter(lar => lar.loanType === 1 &&
+      lar.loanPurpose === 1 &&
+      (lar.loanPropertyType inSet (1 to 2)))
   }
 }
 object N43 extends A4X {
   override val reportId: String = "N43"
-  override def filters(lar: LoanApplicationRegister): Boolean = {
-    List(1, 2).contains(lar.loan.propertyType) &&
-      lar.loan.purpose == 3
+  override def filters(lars: TableQuery[LARTable]) = {
+    lars.filter(lar => (lar.loanPropertyType inSet (1 to 2)) &&
+      lar.loanPurpose === 3)
   }
 }
 object N44 extends A4X {
   override val reportId: String = "N44"
-  override def filters(lar: LoanApplicationRegister): Boolean = {
-    List(1, 2).contains(lar.loan.propertyType) && lar.loan.purpose == 2
+  override def filters(lars: TableQuery[LARTable]) = {
+    lars.filter(lar => (lar.loanPropertyType inSet (1 to 2)) &&
+      lar.loanPurpose === 2)
   }
 }
 object N45 extends A4X {
   override val reportId: String = "N45"
-  override def filters(lar: LoanApplicationRegister): Boolean =
-    lar.loan.propertyType == 3
+  override def filters(lars: TableQuery[LARTable]) =
+    lars.filter(lar => lar.loanPropertyType === 3)
 }
 object N46 extends A4X {
   override val reportId: String = "N46"
-  override def filters(lar: LoanApplicationRegister): Boolean = {
-    lar.loan.occupancy == 2 &&
-      List(1, 2, 3).contains(lar.loan.purpose) &&
-      List(1, 2).contains(lar.loan.propertyType)
+  override def filters(lars: TableQuery[LARTable]) = {
+    lars.filter(lar => lar.loanOccupancy === 2 &&
+      (lar.loanPurpose inSet (1 to 3)) &&
+      (lar.loanPropertyType inSet (1 to 2)))
   }
 }
 object N47 extends A4X {
   override val reportId: String = "N47"
-  override def filters(lar: LoanApplicationRegister): Boolean = {
-    List(1, 2, 3).contains(lar.loan.purpose) &&
-      lar.loan.propertyType == 2
+  override def filters(lars: TableQuery[LARTable]) = {
+    lars.filter(lar => (lar.loanPurpose inSet (1 to 3)) &&
+      lar.loanPropertyType === 2)
   }
 }
 
-trait A4X extends AggregateReport {
+trait A4X extends AggregateReportDB {
   val reportId: String
-  def filters(lar: LoanApplicationRegister): Boolean
+  def filters(lar: TableQuery[LARTable]): Query[LARTable, LARTable#TableElementType, Seq]
 
   val dispositions = List(ApplicationReceived, LoansOriginated, ApprovedButNotAccepted,
     ApplicationsDenied, ApplicationsWithdrawn, ClosedForIncompleteness)
 
-  def generate[ec: EC, mat: MAT, as: AS](
-    larSource: Source[LoanApplicationRegister, NotUsed],
+  def generate[ec: EC](
+    larSource: TableQuery[LARTable],
     fipsCode: Int
   ): Future[AggregateReportPayload] = {
     val metaData = ReportsMetaDataLookup.values(reportId)
 
-    val larsInitialFilters = larSource
-      .filter(lar => lar.geography.msa != "NA")
-      .filter(lar => lar.applicant.income != "NA")
-      .filter(filters)
+    val filteredLars = filters(larSource)
 
-    val reportLars =
-      if (metaData.reportType == NationalAggregate) larsInitialFilters
-      else larsInitialFilters.filter(_.geography.msa.toInt == fipsCode)
+    val reportLars = filteredLars.filter(lar => lar.applicantIncome =!= "NA")
 
-    val incomeIntervals =
-      if (metaData.reportType == NationalAggregate) nationalLarsByIncomeInterval(reportLars)
-      else larsByIncomeInterval(reportLars, calculateMedianIncomeIntervals(fipsCode))
+    val incomeIntervals = nationalLarsByIncomeInterval(reportLars.filter(lar => lar.geographyMsa =!= "NA"))
 
-    val msa: String = if (metaData.reportType == Aggregate) s""""msa": ${msaReport(fipsCode.toString).toJsonFormat},""" else ""
     val reportDate = formattedCurrentDate
-    val yearF = calculateYear(reportLars)
-
     for {
-      year <- yearF
       e1 <- dispositionsOutput(filterEthnicity(reportLars, HispanicOrLatino))
       e1g <- dispositionsByGender(filterEthnicity(reportLars, HispanicOrLatino))
       e2 <- dispositionsOutput(filterEthnicity(reportLars, NotHispanicOrLatino))
@@ -190,18 +183,17 @@ trait A4X extends AggregateReport {
       i3 <- dispositionsOutput(incomeIntervals(Between80And99PercentOfMSAMedian))
       i4 <- dispositionsOutput(incomeIntervals(Between100And119PercentOfMSAMedian))
       i5 <- dispositionsOutput(incomeIntervals(GreaterThan120PercentOfMSAMedian))
-      i6 <- dispositionsOutput(reportLars.filter(lar => lar.applicant.income == "NA"))
+      i6 <- dispositionsOutput(filteredLars.filter(lar => lar.applicantIncome === "NA"))
 
-      total <- dispositionsOutput(reportLars)
+      total <- dispositionsOutput(filteredLars)
     } yield {
       val report = s"""
          |{
          |    "table": "${metaData.reportTable}",
          |    "type": "${metaData.reportType}",
          |    "description": "${metaData.description}",
-         |    "year": "$year",
+         |    "year": "2017",
          |    "reportDate": "$reportDate",
-         |    $msa
          |    "ethnicities": [
          |        {
          |            "ethnicity": "Hispanic or Latino",
@@ -315,9 +307,9 @@ trait A4X extends AggregateReport {
     }
   }
 
-  private def dispositionsOutput[ec: EC, mat: MAT, as: AS](larSource: Source[LoanApplicationRegister, NotUsed]): Future[String] = {
+  private def dispositionsOutput[ec: EC](query: Query[LARTable, LARTable#TableElementType, Seq]): Future[String] = {
     val calculatedDispositions: Future[List[ValueDisposition]] = Future.sequence(
-      dispositions.map(_.calculateValueDisposition(larSource))
+      dispositions.map(_.calculateValueDisposition(query))
     )
 
     calculatedDispositions.map { list =>
@@ -325,7 +317,7 @@ trait A4X extends AggregateReport {
     }
   }
 
-  private def dispositionsByGender[ec: EC, mat: MAT, as: AS](larSource: Source[LoanApplicationRegister, NotUsed]): Future[String] = {
+  private def dispositionsByGender[ec: EC](larSource: Query[LARTable, LARTable#TableElementType, Seq]): Future[String] = {
     for {
       male <- dispositionsOutput(filterGender(larSource, Male))
       female <- dispositionsOutput(filterGender(larSource, Female))

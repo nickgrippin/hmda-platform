@@ -1,7 +1,5 @@
 package hmda.publication
 
-import akka.NotUsed
-import akka.stream.scaladsl._
 import hmda._
 import hmda.publication.model.LARTable
 
@@ -19,14 +17,12 @@ trait DBUtils {
     db.run(q)
   }
 
-
   def sum[ec: EC](input: Query[LARTable, LARTable#TableElementType, Seq]): Future[Int] = {
     val q = for {
       r <- Compiled(input.map(_.loanAmount).sum).result
     } yield r
     db.run(q).map(opt => opt.getOrElse(-1))
   }
-
 
   /*
   def sumDouble[T: AS: MAT](input: Source[T, NotUsed], summation: T => Double): Future[Double] = {
