@@ -4,10 +4,10 @@ import slick.jdbc.PostgresProfile.api._
 
 class TractTable(tag: Tag) extends Table[TractQuery](tag, "tract") {
   def id = column[String]("id", O.PrimaryKey)
-  def msa = column[Int]("msa")
-  def state = column[Int]("state")
-  def county = column[Int]("county")
-  def tract = column[Int]("tract")
+  def msa = column[String]("msa")
+  def state = column[String]("state")
+  def county = column[String]("county")
+  def tract = column[String]("tract")
   def minorityPercent = column[Double]("minorityPercent")
   def tractMfiToMsaPercent = column[Double]("tractMfiToMsaPercent")
   def medianYearBuilt = column[Int]("medianYearBuilt")

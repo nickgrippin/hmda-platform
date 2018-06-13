@@ -10,7 +10,7 @@ import hmda.model.publication.reports.ApplicantIncomeEnum._
 import hmda.model.publication.reports.MinorityStatusEnum._
 import hmda.model.publication.reports.RaceEnum._
 import hmda.model.publication.reports.ReportTypeEnum.{ Aggregate, NationalAggregate }
-import hmda.publication.model.LARTable
+import hmda.publication.model.{ LARTable, TractTable }
 import hmda.publication.reports.{ AS, EC, MAT }
 import hmda.publication.reports.util.db.EthnicityUtilDB._
 import hmda.publication.reports.util.db.MinorityStatusUtilDB.filterMinorityStatus
@@ -126,7 +126,7 @@ object N47 extends A4X {
   }
 }
 
-trait A4X extends AggregateReportDB {
+trait A4X {
   val reportId: String
   def filters(lar: TableQuery[LARTable]): Query[LARTable, LARTable#TableElementType, Seq]
 
@@ -135,6 +135,7 @@ trait A4X extends AggregateReportDB {
 
   def generate[ec: EC](
     larSource: TableQuery[LARTable],
+    tractSource: TableQuery[TractTable],
     fipsCode: Int
   ): Future[AggregateReportPayload] = {
     val metaData = ReportsMetaDataLookup.values(reportId)
@@ -143,7 +144,8 @@ trait A4X extends AggregateReportDB {
 
     val reportLars = filteredLars.filter(lar => lar.applicantIncome =!= "NA")
 
-    val incomeIntervals = nationalLarsByIncomeInterval(reportLars.filter(lar => lar.geographyMsa =!= "NA"))
+    val joined = larSource joinLeft tractSource on ((l, t) => { l.geographyState === t.state && l.geographyCounty === t.county && l.geographyTract === t.tract })
+    val incomeIntervals = nationalLarsByIncomeInterval(reportLars.filter(lar => lar.geographyMsa =!= "NA"), larSource, tractSource)
 
     val reportDate = formattedCurrentDate
     for {

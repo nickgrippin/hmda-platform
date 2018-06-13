@@ -56,6 +56,8 @@ object NationalAggregateGenerator {
   }
 
   def loadTractData = {
+    //Await.result(db.run(tracts.schema.create), 1.minute)
+    //println("Schema created")
     val msas = MsaIncomeLookup.values
     val tractLookup = TractLookup.values
     var count = 0
@@ -63,10 +65,10 @@ object NationalAggregateGenerator {
       val msa = msas.find(m => m.fips == tract.msa.toInt).getOrElse(MsaIncome())
       val query = TractQuery(
         s"${tract.msa}-${tract.state}:${tract.county}:${tract.tract}",
-        tract.msa.toInt,
-        tract.state.toInt,
-        tract.county.toInt,
-        tract.tract.toInt,
+        tract.msa,
+        tract.state,
+        tract.county,
+        tract.tractDec,
         tract.minorityPopulationPercent,
         tract.tractMfiPercentageOfMsaMfi,
         2015 - tract.medianYearHomesBuilt.getOrElse(2016),

@@ -9,7 +9,7 @@ import hmda.model.fi.lar.LoanApplicationRegister
 import hmda.model.publication.reports.ApplicantIncomeEnum._
 import hmda.model.publication.reports._
 import hmda.publication.DBUtils
-import hmda.publication.model.LARTable
+import hmda.publication.model.{ LARTable, TractTable }
 import hmda.publication.reports.util.DateUtil._
 import hmda.publication.reports.util.DispositionType
 
@@ -43,32 +43,34 @@ object ReportUtilDB extends DBUtils {
     Array(i50, i80, i100, i120)
   }
 
-  def larInIncomeInterval(lar: LARTable, applicantIncomeEnum: ApplicantIncomeEnum): Rep[Boolean] = {
-    true
-    /*val incomeIntervals = calculateMedianIncomeIntervals(lar.geographyMsa.asColumnOf[Int])
-    val income = lar.applicantIncome.asColumnOf[Int]
-    (income < incomeIntervals(0) && applicantIncomeEnum == LessThan50PercentOfMSAMedian) ||
-      (income >= incomeIntervals(0) && income < incomeIntervals(1) && applicantIncomeEnum == Between50And79PercentOfMSAMedian) ||
-      (income >= incomeIntervals(1) && income < incomeIntervals(2) && applicantIncomeEnum == Between80And99PercentOfMSAMedian) ||
-      (income >= incomeIntervals(2) && income < incomeIntervals(3) && applicantIncomeEnum == Between100And119PercentOfMSAMedian) ||
-      (income >= incomeIntervals(3) && applicantIncomeEnum == GreaterThan120PercentOfMSAMedian)*/
+  def larInIncomeInterval(lar: LARTable, larTable: TableQuery[LARTable], tracts: TableQuery[TractTable], applicantIncomeEnum: ApplicantIncomeEnum): Rep[Boolean] = {
+    val joined = larTable joinLeft tracts on ((l, t) => { l.geographyMsa === t.msa && l.geographyTract === t.tract })
+    applicantIncomeEnum match {
+      case LessThan50PercentOfMSAMedian => joined.filter()
+    }
   }
 
-  def nationalLarsByIncomeInterval(larSource: Query[LARTable, LARTable#TableElementType, Seq]): Map[ApplicantIncomeEnum, Query[LARTable, LARTable#TableElementType, Seq]] = {
+  def nationalLarsByIncomeInterval(larSource: Query[LARTable, LARTable#TableElementType, Seq], larTable: TableQuery[LARTable], tractSource: TableQuery[TractTable]): Map[ApplicantIncomeEnum, Query[LARTable, LARTable#TableElementType, Seq]] = {
+    val lars50t = for {
+      (c, s) <- larTable joinLeft tractSource on ((l, t) => { l.geographyState === t.state && l.geographyCounty === t.county && l.geographyTract === t.tract })
+    } yield (c, s.map(_.msaMedIncome))
+
+    lars50t
+
     val lars50 = larSource
-      .filter(lar => larInIncomeInterval(lar, LessThan50PercentOfMSAMedian))
+      .filter(lar => joined.filter(l => l._1.applicantIncome.asColumnOf[Double] < l._2.msaMedIncome * 0.5))
 
     val lars50To79 = larSource
-      .filter(lar => larInIncomeInterval(lar, Between50And79PercentOfMSAMedian))
+      .filter(lar => larInIncomeInterval(lar, larTable, tractSource, Between50And79PercentOfMSAMedian))
 
     val lars80To99 = larSource
-      .filter(lar => larInIncomeInterval(lar, Between80And99PercentOfMSAMedian))
+      .filter(lar => larInIncomeInterval(lar, larTable, tractSource, Between80And99PercentOfMSAMedian))
 
     val lars100To120 = larSource
-      .filter(lar => larInIncomeInterval(lar, Between100And119PercentOfMSAMedian))
+      .filter(lar => larInIncomeInterval(lar, larTable, tractSource, Between100And119PercentOfMSAMedian))
 
     val lars120 = larSource
-      .filter(lar => larInIncomeInterval(lar, GreaterThan120PercentOfMSAMedian))
+      .filter(lar => larInIncomeInterval(lar, larTable, tractSource, GreaterThan120PercentOfMSAMedian))
 
     Map(
       LessThan50PercentOfMSAMedian -> lars50,

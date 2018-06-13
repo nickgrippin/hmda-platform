@@ -2,10 +2,10 @@ package hmda.publication.model
 
 case class TractQuery(
   id: String,
-  msa: Int,
-  state: Int,
-  county: Int,
-  tract: Int,
+  msa: String,
+  state: String,
+  county: String,
+  tract: String,
   minorityPercent: Double,
   tractMfiToMsaPercent: Double,
   medianYearBuilt: Int,
