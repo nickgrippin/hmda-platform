@@ -43,11 +43,15 @@ class LARTable(tag: Tag) extends Table[LARQuery](tag, "lar") {
   def rateSpread = column[String]("rateSpread")
   def hoepaStatus = column[Int]("hoepaStatus")
   def lienStatus = column[Int]("lienStatus")
+  def minorityPercent = column[Double]("minorityPercent")
+  def tractMfiToMsaPercent = column[Double]("tractMfiToMsaPercent")
+  def medianYearBuilt = column[Int]("medianYearBuilt")
+  def msaMedIncome = column[Int]("msaMedianIncome")
 
   //16
   def * = (id, respondentId, agencyCode, loanProjection, preapprovals, actionTakenType, actionTakenDate,
     geographyProjection, applicantProjection, purchaserType, denialProjection, rateSpread, hoepaStatus,
-    lienStatus) <> ((LARQuery.apply _).tupled, LARQuery.unapply)
+    lienStatus, msaMedIncome, minorityPercent, tractMfiToMsaPercent, medianYearBuilt) <> ((LARQuery.apply _).tupled, LARQuery.unapply)
 
   //7
   def loanProjection = (loanId, loanApplicationDate, loanType, loanPropertyType, loanPurpose,

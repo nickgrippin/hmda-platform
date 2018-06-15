@@ -14,7 +14,11 @@ case class LARQuery(
   denial: DenialQuery,
   rateSpread: String,
   hoepaStatus: Int,
-  lienStatus: Int
+  lienStatus: Int,
+  msaMedIncome: Int,
+  minorityPercent: Double,
+  tractMfiToMsaPercent: Double,
+  medianYearBuilt: Int
 )
 
 case class LoanQuery(

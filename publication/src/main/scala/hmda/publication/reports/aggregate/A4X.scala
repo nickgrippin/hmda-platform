@@ -135,7 +135,6 @@ trait A4X {
 
   def generate[ec: EC](
     larSource: TableQuery[LARTable],
-    tractSource: TableQuery[TractTable],
     fipsCode: Int
   ): Future[AggregateReportPayload] = {
     val metaData = ReportsMetaDataLookup.values(reportId)
@@ -144,8 +143,7 @@ trait A4X {
 
     val reportLars = filteredLars.filter(lar => lar.applicantIncome =!= "NA")
 
-    val joined = larSource joinLeft tractSource on ((l, t) => { l.geographyState === t.state && l.geographyCounty === t.county && l.geographyTract === t.tract })
-    val incomeIntervals = nationalLarsByIncomeInterval(reportLars.filter(lar => lar.geographyMsa =!= "NA"), larSource, tractSource)
+    val incomeIntervals = nationalLarsByIncomeInterval(reportLars.filter(lar => lar.msaMedIncome > 0))
 
     val reportDate = formattedCurrentDate
     for {

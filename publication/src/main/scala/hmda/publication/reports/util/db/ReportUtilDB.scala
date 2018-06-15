@@ -31,7 +31,7 @@ object ReportUtilDB extends DBUtils {
         MSAReport(fipsCode, CbsaLookup.nameFor(fipsCode), state.stateAbrv, state.stateName)
       case None => MSAReport("", "", "", "")
     }
-  }*/
+  }
 
   def calculateMedianIncomeIntervals(fipsCode: Rep[Int]): Array[Rep[Double]] = {
     val msaIncome = MsaIncomeLookup.values.find(msa => msa.fips == fipsCode).getOrElse(MsaIncome())
@@ -44,33 +44,40 @@ object ReportUtilDB extends DBUtils {
   }
 
   def larInIncomeInterval(lar: LARTable, larTable: TableQuery[LARTable], tracts: TableQuery[TractTable], applicantIncomeEnum: ApplicantIncomeEnum): Rep[Boolean] = {
+    true
     val joined = larTable joinLeft tracts on ((l, t) => { l.geographyMsa === t.msa && l.geographyTract === t.tract })
     applicantIncomeEnum match {
       case LessThan50PercentOfMSAMedian => joined.filter()
     }
-  }
+  }*/
 
-  def nationalLarsByIncomeInterval(larSource: Query[LARTable, LARTable#TableElementType, Seq], larTable: TableQuery[LARTable], tractSource: TableQuery[TractTable]): Map[ApplicantIncomeEnum, Query[LARTable, LARTable#TableElementType, Seq]] = {
-    val lars50t = for {
-      (c, s) <- larTable joinLeft tractSource on ((l, t) => { l.geographyState === t.state && l.geographyCounty === t.county && l.geographyTract === t.tract })
-    } yield (c, s.map(_.msaMedIncome))
-
-    lars50t
-
+  def nationalLarsByIncomeInterval(larSource: Query[LARTable, LARTable#TableElementType, Seq]): Map[ApplicantIncomeEnum, Query[LARTable, LARTable#TableElementType, Seq]] = {
     val lars50 = larSource
-      .filter(lar => joined.filter(l => l._1.applicantIncome.asColumnOf[Double] < l._2.msaMedIncome * 0.5))
+      .filter(lar => lar.applicantIncome.asColumnOf[Double] < lar.msaMedIncome.asColumnOf[Double] * 0.5 / 1000.0)
 
     val lars50To79 = larSource
-      .filter(lar => larInIncomeInterval(lar, larTable, tractSource, Between50And79PercentOfMSAMedian))
+      .filter(lar => {
+        val firstCond = lar.applicantIncome.asColumnOf[Double] >= (lar.msaMedIncome.asColumnOf[Double] * 0.5 / 1000.0)
+        val secondCond = lar.applicantIncome.asColumnOf[Double] < (lar.msaMedIncome.asColumnOf[Double] * 0.8 / 1000.0)
+        firstCond && secondCond
+      })
 
     val lars80To99 = larSource
-      .filter(lar => larInIncomeInterval(lar, larTable, tractSource, Between80And99PercentOfMSAMedian))
+      .filter(lar => {
+        val firstCond = lar.applicantIncome.asColumnOf[Double] >= (lar.msaMedIncome.asColumnOf[Double] * 0.8 / 1000.0)
+        val secondCond = lar.applicantIncome.asColumnOf[Double] < lar.msaMedIncome.asColumnOf[Double] / 1000.0
+        firstCond && secondCond
+      })
 
     val lars100To120 = larSource
-      .filter(lar => larInIncomeInterval(lar, larTable, tractSource, Between100And119PercentOfMSAMedian))
+      .filter(lar => {
+        val firstCond = lar.applicantIncome.asColumnOf[Double] >= lar.msaMedIncome.asColumnOf[Double] / 1000.0
+        val secondCond = lar.applicantIncome.asColumnOf[Double] < (lar.msaMedIncome.asColumnOf[Double] * 1.2 / 1000.0)
+        firstCond && secondCond
+      })
 
     val lars120 = larSource
-      .filter(lar => larInIncomeInterval(lar, larTable, tractSource, GreaterThan120PercentOfMSAMedian))
+      .filter(lar => lar.applicantIncome.asColumnOf[Double] >= lar.msaMedIncome.asColumnOf[Double] * 1.2 / 1000.0)
 
     Map(
       LessThan50PercentOfMSAMedian -> lars50,
@@ -80,7 +87,7 @@ object ReportUtilDB extends DBUtils {
       GreaterThan120PercentOfMSAMedian -> lars120
     )
   }
-
+ /*
   def larsByIncomeInterval(larSource: Source[LoanApplicationRegister, NotUsed], incomeIntervals: Array[Double]): Map[ApplicantIncomeEnum, Source[LoanApplicationRegister, NotUsed]] = {
     val lars50 = larSource
       .filter(lar => lar.applicant.income.toInt < incomeIntervals(0))
@@ -105,7 +112,7 @@ object ReportUtilDB extends DBUtils {
       GreaterThan120PercentOfMSAMedian -> lars120
     )
   }
-  /*
+
   def calculateYear[ec: EC, mat: MAT, as: AS](larSource: Source[LoanApplicationRegister, NotUsed]): Future[Int] = {
     collectHeadValue(larSource).map {
       case Success(lar) => lar.actionTakenDate.toString.substring(0, 4).toInt
