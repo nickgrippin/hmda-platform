@@ -11,7 +11,8 @@ import hmda.model.publication.reports._
 import hmda.publication.DBUtils
 import hmda.publication.model.{ LARTable, TractTable }
 import hmda.publication.reports.util.DateUtil._
-import hmda.publication.reports.util.DispositionType
+import hmda.publication.reports.util.db.DispositionTypeDB
+import hmda.publication.reports._
 
 import scala.concurrent.Future
 import scala.util.Success
@@ -87,7 +88,7 @@ object ReportUtilDB extends DBUtils {
       GreaterThan120PercentOfMSAMedian -> lars120
     )
   }
- /*
+  /*
   def larsByIncomeInterval(larSource: Source[LoanApplicationRegister, NotUsed], incomeIntervals: Array[Double]): Map[ApplicantIncomeEnum, Source[LoanApplicationRegister, NotUsed]] = {
     val lars50 = larSource
       .filter(lar => lar.applicant.income.toInt < incomeIntervals(0))
@@ -125,12 +126,12 @@ object ReportUtilDB extends DBUtils {
     dispositions: List[DispositionType]
   ): Future[List[ValueDisposition]] = {
     Future.sequence(dispositions.map(_.calculateValueDisposition(larSource)))
-  }
+  }*/
 
-  def calculatePercentageDispositions[ec: EC, mat: MAT, as: AS](
-    larSource: Source[LoanApplicationRegister, NotUsed],
-    dispositions: List[DispositionType],
-    totalDisp: DispositionType
+  def calculatePercentageDispositions[ec: EC](
+    larSource: Query[LARTable, LARTable#TableElementType, Seq],
+    dispositions: List[DispositionTypeDB],
+    totalDisp: DispositionTypeDB
   ): Future[List[PercentageDisposition]] = {
 
     val calculatedDispositionsF: Future[List[PercentageDisposition]] =
@@ -138,7 +139,7 @@ object ReportUtilDB extends DBUtils {
 
     for {
       calculatedDispositions <- calculatedDispositionsF
-      totalCount <- count(larSource.filter(totalDisp.filter))
+      totalCount <- count(larSource.filter(lar => totalDisp.filter(lar)))
     } yield {
 
       val withPercentages: List[PercentageDisposition] = calculatedDispositions.map { d =>
@@ -150,6 +151,6 @@ object ReportUtilDB extends DBUtils {
 
       withPercentages :+ total
     }
-  }*/
+  }
 
 }

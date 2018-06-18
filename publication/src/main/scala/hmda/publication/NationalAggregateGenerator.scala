@@ -1,9 +1,11 @@
 package hmda.publication
 
+import java.io.{ File, PrintWriter }
+
 import hmda.census.model._
 import hmda.parser.fi.lar.LarCsvParser
 import hmda.publication.model._
-import hmda.publication.reports.aggregate.{ N41, NationalAggregateA1 }
+import hmda.publication.reports.aggregate._
 import slick.jdbc.PostgresProfile.api._
 
 import scala.concurrent.{ Await, ExecutionContext }
@@ -20,9 +22,15 @@ object NationalAggregateGenerator {
   val msas = MsaIncomeLookup.values
 
   def main(args: Array[String]): Unit = {
-    //val report = Await.result(N41.generate(lars, -1), 5.hours)
-    //println(s"Finished!\n\n${report.report}")
-    loadLarData(args(0).toInt)
+    val reportList: List[A8X] = List(N82, N83, N84, N85, N86, N87)
+    for (report <- reportList) {
+      val r = Await.result(report.generate(lars, -1), 5.hours)
+      val writer = new PrintWriter(new File(s"${r.reportID}.txt"))
+      writer.write(r.report)
+      Thread.sleep(10000)
+      writer.close()
+    }
+    //loadLarData(args(0).toInt)
     Thread.sleep(10000)
     db.close()
     //val report = NationalAggregateA1.generateList(lars2)

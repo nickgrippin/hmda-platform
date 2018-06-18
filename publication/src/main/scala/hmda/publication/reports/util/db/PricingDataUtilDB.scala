@@ -3,15 +3,17 @@ package hmda.publication.reports.util.db
 import akka.NotUsed
 import akka.stream.scaladsl.Source
 import hmda.model.fi.lar.LoanApplicationRegister
+import hmda.publication.DBUtils
+import hmda.publication.model.LARTable
 import hmda.publication.reports._
-import hmda.util.SourceUtils
 
 import scala.concurrent.Future
 import scala.util.{ Success, Try }
+import slick.jdbc.PostgresProfile.api._
 
-object PricingDataUtilDB extends SourceUtils {
+object PricingDataUtilDB extends DBUtils {
 
-  def pricingData[ec: EC, mat: MAT, as: AS](lars: Source[LoanApplicationRegister, NotUsed]): Future[String] = {
+  def pricingData[ec: EC](lars: Query[LARTable, LARTable#TableElementType, Seq]): Future[String] = {
     for {
       noData <- pricingDisposition(lars, _.rateSpread == "NA", "No Reported Pricing Data")
       reported <- pricingDisposition(lars, pricingDataReported, "Reported Pricing Data")
@@ -54,10 +56,10 @@ object PricingDataUtilDB extends SourceUtils {
     rateSpreadBetween(Int.MinValue, Int.MaxValue)(lar)
   }
 
-  private def pricingDisposition[ec: EC, mat: MAT, as: AS](larSource: Source[LoanApplicationRegister, NotUsed], filter: LoanApplicationRegister => Boolean, title: String): Future[String] = {
-    val loansFiltered = larSource.filter(filter)
+  private def pricingDisposition[ec: EC](larSource: Query[LARTable, LARTable#TableElementType, Seq], filter: Query[LARTable, LARTable#TableElementType, Seq] => Query[LARTable, LARTable#TableElementType, Seq], title: String): Future[String] = {
+    val loansFiltered = filter(larSource)
     val loanCountF = count(loansFiltered)
-    val valueSumF = sum(loansFiltered, loanAmount)
+    val valueSumF = sum(loansFiltered)
     for {
       count <- loanCountF
       totalValue <- valueSumF

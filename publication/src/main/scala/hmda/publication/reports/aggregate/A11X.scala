@@ -10,19 +10,22 @@ import hmda.model.publication.reports.ApplicantIncomeEnum._
 import hmda.model.publication.reports.MinorityStatusEnum._
 import hmda.model.publication.reports.RaceEnum._
 import hmda.model.publication.reports.ReportTypeEnum.Aggregate
+import hmda.publication.model.LARTable
 import hmda.publication.reports.util.CensusTractUtil._
 import hmda.publication.reports.{ AS, EC, MAT }
-import hmda.publication.reports.util.EthnicityUtil.filterEthnicity
-import hmda.publication.reports.util.GenderUtil.filterGender
-import hmda.publication.reports.util.MinorityStatusUtil.filterMinorityStatus
-import hmda.publication.reports.util.PricingDataUtil._
-import hmda.publication.reports.util.RaceUtil.filterRace
-import hmda.publication.reports.util.ReportUtil._
+import hmda.publication.reports.util.db.EthnicityUtilDB.filterEthnicity
+import hmda.publication.reports.util.db.GenderUtilDB.filterGender
+import hmda.publication.reports.util.db.MinorityStatusUtilDB.filterMinorityStatus
+import hmda.publication.reports.util.db.PricingDataUtilDB._
+import hmda.publication.reports.util.db.RaceUtilDB.filterRace
+import hmda.publication.reports.util.db.ReportUtilDB._
 import hmda.publication.reports.util.ReportsMetaDataLookup
+import slick.lifted.TableQuery
 
 import scala.concurrent.Future
+import slick.jdbc.PostgresProfile.api._
 
-object A11_1 extends A11X {
+/*object A11_1 extends A11X {
   val reportId = "A11-1"
   def filters(lar: LoanApplicationRegister): Boolean = {
     val loan = lar.loan
@@ -110,133 +113,115 @@ object A11_10 extends A11X {
     loan.loanType == 1 && loan.purpose == 2 && lar.lienStatus == 2 &&
       loan.propertyType == 1 && loan.occupancy == 1
   }
-}
+}*/
 
 object N11_1 extends A11X {
   val reportId = "N11-1"
-  def filters(lar: LoanApplicationRegister): Boolean = {
-    val loan = lar.loan
-    loan.loanType == 2 && loan.purpose == 1 && lar.lienStatus == 1 &&
-      loan.propertyType == 1 && loan.occupancy == 1
+  def filters(lars: TableQuery[LARTable]) = {
+    lars.filter(lar => lar.loanType === 2 && lar.loanPurpose === 1 && lar.lienStatus === 1 &&
+      lar.loanPropertyType === 1 && lar.loanOccupancy === 1)
   }
 }
 
 object N11_2 extends A11X {
   val reportId = "N11-2"
-  def filters(lar: LoanApplicationRegister): Boolean = {
-    val loan = lar.loan
-    loan.loanType == 3 && loan.purpose == 1 && lar.lienStatus == 1 &&
-      loan.propertyType == 1 && loan.occupancy == 1
+  def filters(lars: TableQuery[LARTable]) = {
+    lars.filter(lar => lar.loanType === 3 && lar.loanPurpose === 1 && lar.lienStatus === 1 &&
+      lar.loanPropertyType === 1 && lar.loanOccupancy === 1)
   }
 }
 
 object N11_3 extends A11X {
   val reportId = "N11-3"
-  def filters(lar: LoanApplicationRegister): Boolean = {
-    val loan = lar.loan
-    loan.loanType == 1 && loan.purpose == 1 && lar.lienStatus == 1 &&
-      loan.propertyType == 1 && loan.occupancy == 1
+  def filters(lars: TableQuery[LARTable]) = {
+    lars.filter(lar => lar.loanType === 1 && lar.loanPurpose === 1 && lar.lienStatus === 1 &&
+      lar.loanPropertyType === 1 && lar.loanOccupancy === 1)
   }
 }
 
 object N11_4 extends A11X {
   val reportId = "N11-4"
-  def filters(lar: LoanApplicationRegister): Boolean = {
-    val loan = lar.loan
-    loan.loanType == 1 && loan.purpose == 1 && lar.lienStatus == 2 &&
-      loan.propertyType == 1 && loan.occupancy == 1
+  def filters(lars: TableQuery[LARTable]) = {
+    lars.filter(lar => lar.loanType === 1 && lar.loanPurpose === 1 && lar.lienStatus === 2 &&
+      lar.loanPropertyType === 1 && lar.loanOccupancy === 1)
   }
 }
 
 object N11_5 extends A11X {
   val reportId = "N11-5"
-  def filters(lar: LoanApplicationRegister): Boolean = {
-    val loan = lar.loan
-    loan.loanType == 2 && loan.purpose == 3 && lar.lienStatus == 1 &&
-      loan.propertyType == 1 && loan.occupancy == 1
+  def filters(lars: TableQuery[LARTable]) = {
+    lars.filter(lar => lar.loanType === 2 && lar.loanPurpose === 3 && lar.lienStatus === 1 &&
+      lar.loanPropertyType === 1 && lar.loanOccupancy === 1)
   }
 }
 
 object N11_6 extends A11X {
   val reportId = "N11-6"
-  def filters(lar: LoanApplicationRegister): Boolean = {
-    val loan = lar.loan
-    loan.loanType == 3 && loan.purpose == 3 && lar.lienStatus == 1 &&
-      loan.propertyType == 1 && loan.occupancy == 1
+  def filters(lars: TableQuery[LARTable]) = {
+    lars.filter(lar => lar.loanType === 3 && lar.loanPurpose === 3 && lar.lienStatus === 1 &&
+      lar.loanPropertyType === 1 && lar.loanOccupancy === 1)
   }
 }
 
 object N11_7 extends A11X {
   val reportId = "N11-7"
-  def filters(lar: LoanApplicationRegister): Boolean = {
-    val loan = lar.loan
-    loan.loanType == 1 && loan.purpose == 3 && lar.lienStatus == 1 &&
-      loan.propertyType == 1 && loan.occupancy == 1
+  def filters(lars: TableQuery[LARTable]) = {
+    lars.filter(lar => lar.loanType === 1 && lar.loanPurpose === 3 && lar.lienStatus === 1 &&
+      lar.loanPropertyType === 1 && lar.loanOccupancy === 1)
   }
 }
 
 object N11_8 extends A11X {
   val reportId = "N11-8"
-  def filters(lar: LoanApplicationRegister): Boolean = {
-    val loan = lar.loan
-    loan.loanType == 1 && loan.purpose == 3 && lar.lienStatus == 2 &&
-      loan.propertyType == 1 && loan.occupancy == 1
+  def filters(lars: TableQuery[LARTable]) = {
+    lars.filter(lar => lar.loanType === 1 && lar.loanPurpose === 3 && lar.lienStatus === 2 &&
+      lar.loanPropertyType === 1 && lar.loanOccupancy === 1)
   }
 }
 
 object N11_9 extends A11X {
   val reportId = "N11-9"
-  def filters(lar: LoanApplicationRegister): Boolean = {
-    val loan = lar.loan
-    loan.loanType == 1 && loan.purpose == 2 && lar.lienStatus == 1 &&
-      loan.propertyType == 1 && loan.occupancy == 1
+  def filters(lars: TableQuery[LARTable]) = {
+    lars.filter(lar => lar.loanType === 1 && lar.loanPurpose === 2 && lar.lienStatus === 1 &&
+      lar.loanPropertyType === 1 && lar.loanOccupancy === 1)
   }
 }
 
 object N11_10 extends A11X {
   val reportId = "N11-10"
-  def filters(lar: LoanApplicationRegister): Boolean = {
-    val loan = lar.loan
-    loan.loanType == 1 && loan.purpose == 2 && lar.lienStatus == 2 &&
-      loan.propertyType == 1 && loan.occupancy == 1
+  def filters(lars: TableQuery[LARTable]) = {
+    lars.filter(lar => lar.loanType === 1 && lar.loanPurpose === 2 && lar.lienStatus === 2 &&
+      lar.loanPropertyType === 1 && lar.loanOccupancy === 1)
   }
 }
 
-trait A11X extends AggregateReport {
+trait A11X {
   val reportId: String
-  def filters(lar: LoanApplicationRegister): Boolean
+  def filters(lar: TableQuery[LARTable]): Query[LARTable, LARTable#TableElementType, Seq]
 
   def geoFilter(fips: Int)(lar: LoanApplicationRegister): Boolean =
     lar.geography.msa != "NA" &&
       lar.geography.msa.toInt == fips
 
-  def generate[ec: EC, mat: MAT, as: AS](
-    larSource: Source[LoanApplicationRegister, NotUsed],
+  def generate[ec: EC](
+    larSource: TableQuery[LARTable],
     fipsCode: Int
   ): Future[AggregateReportPayload] = {
 
     val metaData = ReportsMetaDataLookup.values(reportId)
 
-    val lars =
-      if (metaData.reportType == Aggregate) larSource.filter(filters).filter(geoFilter(fipsCode))
-      else larSource.filter(filters)
+    val lars = filters(larSource)
 
-    val larsForIncomeCalculation = lars.filter(lar => lar.applicant.income != "NA" && lar.geography.msa != "NA")
-    val incomeIntervals =
-      if (metaData.reportType == Aggregate) larsByIncomeInterval(larsForIncomeCalculation, calculateMedianIncomeIntervals(fipsCode))
-      else nationalLarsByIncomeInterval(larsForIncomeCalculation)
+    val larsForIncomeCalculation = lars.filter(lar => lar.applicantIncome =!= "NA" && lar.msaMedIncome > 0)
+    val incomeIntervals = nationalLarsByIncomeInterval(larsForIncomeCalculation)
 
-    val msa: String = if (metaData.reportType == Aggregate) s""""msa": ${msaReport(fipsCode.toString).toJsonFormat},""" else ""
     val reportDate = formattedCurrentDate
-    val yearF = calculateYear(lars)
 
     val msaTracts: Set[Tract] =
       if (metaData.reportType == Aggregate) TractLookup.values.filter(_.msa == fipsCode.toString)
       else TractLookup.values
 
     for {
-      year <- yearF
-
       e1 <- pricingData(filterEthnicity(lars, HispanicOrLatino))
       e2 <- pricingData(filterEthnicity(lars, NotHispanicOrLatino))
       e3 <- pricingData(filterEthnicity(lars, JointEthnicity))
@@ -264,7 +249,7 @@ trait A11X extends AggregateReport {
       i3 <- pricingData(incomeIntervals(Between80And99PercentOfMSAMedian))
       i4 <- pricingData(incomeIntervals(Between100And119PercentOfMSAMedian))
       i5 <- pricingData(incomeIntervals(GreaterThan120PercentOfMSAMedian))
-      i6 <- pricingData(lars.filter(lar => lar.applicant.income == "NA"))
+      i6 <- pricingData(lars.filter(lar => lar.applicantIncome === "NA"))
 
       tractMinorityComposition1 <- pricingData(filterMinorityPopulation(lars, 0, 10, msaTracts))
       tractMinorityComposition2 <- pricingData(filterMinorityPopulation(lars, 10, 20, msaTracts))
@@ -283,9 +268,8 @@ trait A11X extends AggregateReport {
                       |    "table": "${metaData.reportTable}",
                       |    "type": "${metaData.reportType}",
                       |    "description": "${metaData.description}",
-                      |    "year": "$year",
+                      |    "year": "2017",
                       |    "reportDate": "$reportDate",
-                      |    $msa
                       |    "borrowerCharacteristics": [
                       |        {
                       |            "characteristic": "Race",
