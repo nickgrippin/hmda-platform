@@ -51,7 +51,7 @@ object PricingDataUtilDB extends DBUtils {
 
   private def pricingDisposition[ec: EC](filter: Query[LARTable, LARTable#TableElementType, Seq], title: String): Future[String] = {
     val loanCountF = count(filter)
-    val valueSumF = sum(filter)
+    val valueSumF = sumLoanAmount(filter)
     for {
       count <- loanCountF
       totalValue <- valueSumF

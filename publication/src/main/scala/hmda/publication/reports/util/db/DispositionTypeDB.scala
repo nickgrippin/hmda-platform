@@ -16,7 +16,7 @@ sealed abstract class DispositionTypeDB(
   def calculateValueDisposition[ec: EC](query: Query[LARTable, LARTable#TableElementType, Seq]): Future[ValueDisposition] = {
     val loansFiltered = query.filter(filter)
     val loanCountF = count(loansFiltered)
-    val totalValueF = sum(loansFiltered)
+    val totalValueF = sumLoanAmount(loansFiltered)
     for {
       count <- loanCountF
       total <- totalValueF

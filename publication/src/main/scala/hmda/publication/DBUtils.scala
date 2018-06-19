@@ -18,18 +18,28 @@ trait DBUtils {
     db.run(q)
   }
 
-  def sum[ec: EC](input: Query[LARTable, LARTable#TableElementType, Seq]): Future[Int] = {
+  def sumLoanAmount[ec: EC](input: Query[LARTable, LARTable#TableElementType, Seq]): Future[Int] = {
     val q = for {
       r <- Compiled(input.map(_.loanAmount).sum).result
     } yield r
     db.run(q).map(opt => opt.getOrElse(-1))
   }
 
-  /*
-  def sumDouble[T: AS: MAT](input: Source[T, NotUsed], summation: T => Double): Future[Double] = {
-    input.runWith(sinkSumDouble(summation))
+
+  def sumRateSpread[ec: EC](input: Query[LARTable, LARTable#TableElementType, Seq]): Future[Double] = {
+    val q = for {
+      r <- Compiled(input.map(_.rateSpread.asColumnOf[Double]).sum).result
+    } yield r
+    db.run(q).map(opt => opt.getOrElse(0.0))
   }
 
+  def sumWeightedRateSpread[ec: EC](input: Query[LARTable, LARTable#TableElementType, Seq], total: Double): Future[Double] = {
+    val q = for {
+      r <- Compiled(input.map(lar => (lar.loanAmount.asColumnOf[Double] / total) * (lar.rateSpread.asColumnOf[Double] / 100.0)).sum).result
+    } yield r
+    db.run(q).map(opt => opt.getOrElse(0.0))
+  }
+  /*
   def collectHeadValue[T: AS: MAT: EC](input: Source[T, NotUsed]): Future[Try[T]] = {
     input.take(1).runWith(Sink.seq).map(xs => Try(xs.head))
   }
@@ -55,9 +65,9 @@ trait DBUtils {
     }
   }*/
 
-  def calculateMean[ec: EC, mat: MAT, as: AS, T](source: Query[LARTable, LARTable#TableElementType, Seq]): Future[Double] = {
+  def calculateMean[ec: EC](source: Query[LARTable, LARTable#TableElementType, Seq]): Future[Double] = {
     val loanCountF = count(source)
-    val valueSumF = sumDouble(source, f)
+    val valueSumF = sumRateSpread(source)
 
     for {
       count <- loanCountF
@@ -71,15 +81,19 @@ trait DBUtils {
     }
   }
 
-  def calculateMedian[ec: EC, mat: MAT, as: AS, T](source: Query[LARTable, LARTable#TableElementType, Seq]): Future[Double] = {
-    // If this method encounters collections that are too large and overload memory,
-    //   add this to the statement below, with a reasonable limit:
-    //   .limit(MAX_SIZE)
-    val valuesF: Future[Seq[Double]] = source.map(f).runWith(Sink.seq)
+  def calculateWeightedMean[ec: EC](source: Query[LARTable, LARTable#TableElementType, Seq]): Future[Double] = {
+    val sL = sumLoanAmount(source)
+    for {
+      sumLoans <- sL
+      sumWeight <- sumWeightedRateSpread(source, sumLoans)
+    } yield sumWeight
+  }
 
-    valuesF.map { seq =>
-      if (seq.isEmpty) 0 else calculateMedian(seq)
-    }
+  def calculateMedian[ec: EC](source: Query[LARTable, LARTable#TableElementType, Seq]): Future[Double] = {
+    val q = for {
+      all <- Compiled(source.map(_.rateSpread.asColumnOf[Double])).result
+    } yield all
+    db.run(q).map(calculateMedian(_))
   }
 
   def calculateMedian(seq: Seq[Double]): Double = {
