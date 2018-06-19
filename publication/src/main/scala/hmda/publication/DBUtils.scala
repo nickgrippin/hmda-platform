@@ -102,4 +102,41 @@ trait DBUtils {
     BigDecimal(median).setScale(2, BigDecimal.RoundingMode.HALF_UP).toDouble
   }
 
+  def calculateWeightedMedian[ec: EC](source: Query[LARTable, LARTable#TableElementType, Seq]): Future[Double] = {
+    val mapped = source.map(lar => (lar.loanAmount.asColumnOf[Int], lar.rateSpread.asColumnOf[Double]))
+    val q = for {
+      all <- Compiled(mapped).result
+    } yield all
+
+    db.run(q).map(seq => {
+      if (seq.isEmpty) 0
+      else if (seq.length == 1) seq.head._2
+      else calculateWeightedMedianHelper(seq)
+    })
+  }
+
+  def calculateWeightedMedianHelper(seq: Seq[(Int, Double)]): Double = {
+    val sumLoans = seq.map(i => i._1).sum //Sum of all loans
+
+    val sortedSeq = seq.sortWith((a, b) => a._2 < b._2) //Sort by rate spread
+    val weighted = sortedSeq.map(i => (i._1.toDouble / sumLoans, i._2)) //Loan amount weighted by total loan amount
+
+    val w = weightedMedian(weighted, sortedSeq.length / 2)
+    BigDecimal(w).setScale(2, BigDecimal.RoundingMode.HALF_UP).toDouble
+  }
+
+  def weightedMedian(seq: Seq[(Double, Double)], pivot: Int): Double = {
+    val seq1 = seq.slice(0, pivot)
+    val seq2 = seq.slice(pivot + 1, seq.length)
+    val w1 = seq1.map(i => i._1).sum
+    val w2 = seq2.map(i => i._1).sum
+
+    if (w1 <= 0.50001 && w2 <= 0.50001)
+      seq(pivot)._2
+    else if (w1 >= 0.5)
+      weightedMedian(seq, pivot - 1)
+    else
+      weightedMedian(seq, pivot + 1)
+  }
+
 }
