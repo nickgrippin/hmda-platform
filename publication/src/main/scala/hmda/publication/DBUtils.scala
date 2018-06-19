@@ -1,5 +1,6 @@
 package hmda.publication
 
+import akka.NotUsed
 import hmda._
 import hmda.publication.model.LARTable
 
@@ -52,9 +53,9 @@ trait DBUtils {
       val total = acc + summation(lar)
       total
     }
-  }
+  }*/
 
-  def calculateMean[ec: EC, mat: MAT, as: AS, T](source: Source[T, NotUsed], f: T => Double): Future[Double] = {
+  def calculateMean[ec: EC, mat: MAT, as: AS, T](source: Query[LARTable, LARTable#TableElementType, Seq]): Future[Double] = {
     val loanCountF = count(source)
     val valueSumF = sumDouble(source, f)
 
@@ -70,7 +71,7 @@ trait DBUtils {
     }
   }
 
-  def calculateMedian[ec: EC, mat: MAT, as: AS, T](source: Source[T, NotUsed], f: T => Double): Future[Double] = {
+  def calculateMedian[ec: EC, mat: MAT, as: AS, T](source: Query[LARTable, LARTable#TableElementType, Seq]): Future[Double] = {
     // If this method encounters collections that are too large and overload memory,
     //   add this to the statement below, with a reasonable limit:
     //   .limit(MAX_SIZE)
@@ -85,6 +86,6 @@ trait DBUtils {
     val (lowerHalf, upperHalf) = seq.sortWith(_ < _).splitAt(seq.size / 2)
     val median = if (seq.size % 2 == 0) (lowerHalf.last + upperHalf.head) / 2.0 else upperHalf.head
     BigDecimal(median).setScale(2, BigDecimal.RoundingMode.HALF_UP).toDouble
-  }*/
+  }
 
 }

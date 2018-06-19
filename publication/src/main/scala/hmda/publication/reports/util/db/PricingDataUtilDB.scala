@@ -1,7 +1,5 @@
 package hmda.publication.reports.util.db
 
-import akka.NotUsed
-import akka.stream.scaladsl.Source
 import hmda.model.fi.lar.LoanApplicationRegister
 import hmda.publication.DBUtils
 import hmda.publication.model.LARTable
@@ -14,18 +12,20 @@ import slick.jdbc.PostgresProfile.api._
 object PricingDataUtilDB extends DBUtils {
 
   def pricingData[ec: EC](lars: Query[LARTable, LARTable#TableElementType, Seq]): Future[String] = {
+    val rsNum = lars.filter(lar => lar.rateSpread =!= "NA")
+    val aboveThresh = rsNum.filter(lar => lar.rateSpread.asColumnOf[Double] >= 1.5)
     for {
-      noData <- pricingDisposition(lars, _.rateSpread == "NA", "No Reported Pricing Data")
-      reported <- pricingDisposition(lars, pricingDataReported, "Reported Pricing Data")
-      rs1_5 <- pricingDisposition(lars, rateSpreadBetween(1.5, 2), "1.50 - 1.99")
-      rs2_0 <- pricingDisposition(lars, rateSpreadBetween(2, 2.5), "2.00 - 2.49")
-      rs2_5 <- pricingDisposition(lars, rateSpreadBetween(2.5, 3), "2.50 - 2.99")
-      rs3 <- pricingDisposition(lars, rateSpreadBetween(3, 4), "3.00 - 3.99")
-      rs4 <- pricingDisposition(lars, rateSpreadBetween(4, 5), "4.00 - 4.99")
-      rs5 <- pricingDisposition(lars, rateSpreadBetween(5, Int.MaxValue), "5 or more")
-      mean <- reportedMean(lars)
-      median <- reportedMedian(lars)
-      hoepa <- pricingDisposition(lars.filter(_.hoepaStatus == 1), (lar: LoanApplicationRegister) => true, "HOEPA Loans")
+      noData <- pricingDisposition(lars.filter(lar => lar.rateSpread === "NA"), "No Reported Pricing Data")
+      reported <- pricingDisposition(rsNum, "Reported Pricing Data")
+      rs1_5 <- pricingDisposition(rsNum.filter(lar => rateSpreadBetween(lar, 1.5, 2)), "1.50 - 1.99")
+      rs2_0 <- pricingDisposition(rsNum.filter(lar => rateSpreadBetween(lar, 2, 2.5)), "2.00 - 2.49")
+      rs2_5 <- pricingDisposition(rsNum.filter(lar => rateSpreadBetween(lar, 2.5, 3)), "2.50 - 2.99")
+      rs3 <- pricingDisposition(rsNum.filter(lar => rateSpreadBetween(lar, 3, 4)), "3.00 - 3.99")
+      rs4 <- pricingDisposition(rsNum.filter(lar => rateSpreadBetween(lar, 4, 5)), "4.00 - 4.99")
+      rs5 <- pricingDisposition(rsNum.filter(lar => rateSpreadBetween(lar, 5, Int.MaxValue)), "5 or more")
+      mean <- reportedMean(aboveThresh)
+      median <- reportedMedian(aboveThresh)
+      hoepa <- pricingDisposition(lars.filter(_.hoepaStatus === 1), "HOEPA Loans")
     } yield {
       s"""
          |[
@@ -45,21 +45,13 @@ object PricingDataUtilDB extends DBUtils {
     }
   }
 
-  def rateSpreadBetween(lower: Double, upper: Double)(lar: LoanApplicationRegister): Boolean = {
-    Try(lar.rateSpread.toDouble) match {
-      case Success(value) => value >= lower && value < upper
-      case _ => false
-    }
+  def rateSpreadBetween(lar: LARTable, lower: Double, upper: Double): Rep[Boolean] = {
+    lar.rateSpread.asColumnOf[Double] >= lower && lar.rateSpread.asColumnOf[Double] < upper
   }
 
-  def pricingDataReported(lar: LoanApplicationRegister): Boolean = {
-    rateSpreadBetween(Int.MinValue, Int.MaxValue)(lar)
-  }
-
-  private def pricingDisposition[ec: EC](larSource: Query[LARTable, LARTable#TableElementType, Seq], filter: Query[LARTable, LARTable#TableElementType, Seq] => Query[LARTable, LARTable#TableElementType, Seq], title: String): Future[String] = {
-    val loansFiltered = filter(larSource)
-    val loanCountF = count(loansFiltered)
-    val valueSumF = sum(loansFiltered)
+  private def pricingDisposition[ec: EC](filter: Query[LARTable, LARTable#TableElementType, Seq], title: String): Future[String] = {
+    val loanCountF = count(filter)
+    val valueSumF = sum(filter)
     for {
       count <- loanCountF
       totalValue <- valueSumF
@@ -74,15 +66,9 @@ object PricingDataUtilDB extends DBUtils {
     }
   }
 
-  def loanAmount(lar: LoanApplicationRegister): Int = lar.loan.amount
-  def rateSpread(lar: LoanApplicationRegister): Double =
-    Try(lar.rateSpread.toDouble).getOrElse(0)
-
-  private def reportedMean[ec: EC, mat: MAT, as: AS](lars: Source[LoanApplicationRegister, NotUsed]): Future[String] = {
-    val loansFiltered = lars.filter(rateSpreadBetween(1.5, Int.MaxValue))
-
-    val meanCount = calculateMean(loansFiltered, rateSpread)
-    val meanValue = calculateMean(loansFiltered, loanAmount)
+  private def reportedMean[ec: EC, mat: MAT, as: AS](lars: Query[LARTable, LARTable#TableElementType, Seq]): Future[String] = {
+    val meanCount = calculateMean(lars, rateSpread)
+    val meanValue = calculateMean(lars, loanAmount)
 
     Future.sequence(List(meanCount, meanValue)).map { results =>
       s"""
@@ -95,7 +81,7 @@ object PricingDataUtilDB extends DBUtils {
     }
   }
 
-  private def reportedMedian[ec: EC, mat: MAT, as: AS](lars: Source[LoanApplicationRegister, NotUsed]): Future[String] = {
+  private def reportedMedian[ec: EC, mat: MAT, as: AS](lars: Query[LARTable, LARTable#TableElementType, Seq]): Future[String] = {
     val medianCount = calculateMedian(lars.filter(rateSpreadBetween(1.5, Int.MaxValue)), rateSpread)
     val medianValue = calculateMedian(lars.filter(rateSpreadBetween(1.5, Int.MaxValue)), loanAmount)
 

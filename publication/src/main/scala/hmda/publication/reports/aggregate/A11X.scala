@@ -217,9 +217,7 @@ trait A11X {
 
     val reportDate = formattedCurrentDate
 
-    val msaTracts: Set[Tract] =
-      if (metaData.reportType == Aggregate) TractLookup.values.filter(_.msa == fipsCode.toString)
-      else TractLookup.values
+    val msaTracts: Set[Tract] = TractLookup.values
 
     for {
       e1 <- pricingData(filterEthnicity(lars, HispanicOrLatino))
