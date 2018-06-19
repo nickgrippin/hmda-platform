@@ -75,19 +75,22 @@ object PricingDataUtil extends SourceUtils {
   def loanAmount(lar: LoanApplicationRegister): Int = lar.loan.amount
   def rateSpread(lar: LoanApplicationRegister): Double =
     Try(lar.rateSpread.toDouble).getOrElse(0)
+  def combined(lar: LoanApplicationRegister): (Int, Double) = (loanAmount(lar), rateSpread(lar))
 
   private def reportedMean[ec: EC, mat: MAT, as: AS](lars: Source[LoanApplicationRegister, NotUsed]): Future[String] = {
     val loansFiltered = lars.filter(rateSpreadBetween(1.5, Int.MaxValue))
 
-    val meanCount = calculateMean(loansFiltered, rateSpread)
-    val meanValue = calculateMean(loansFiltered, loanAmount)
-
-    Future.sequence(List(meanCount, meanValue)).map { results =>
+    for {
+      count <- sum(loansFiltered, loanAmount)
+      meanCount <- calculateMean(loansFiltered, rateSpread)
+      weighted <- weightedSum(loansFiltered, loanAmount, count, rateSpread)
+    } yield {
+      val roundWeighted = BigDecimal(weighted * 100).setScale(2, BigDecimal.RoundingMode.HALF_UP).toDouble
       s"""
          |{
          |    "pricing": "Mean",
-         |    "count": ${results.head},
-         |    "value": ${results(1).toInt}
+         |    "count": $meanCount,
+         |    "value": $roundWeighted
          |}
        """.stripMargin
     }
@@ -95,14 +98,14 @@ object PricingDataUtil extends SourceUtils {
 
   private def reportedMedian[ec: EC, mat: MAT, as: AS](lars: Source[LoanApplicationRegister, NotUsed]): Future[String] = {
     val medianCount = calculateMedian(lars.filter(rateSpreadBetween(1.5, Int.MaxValue)), rateSpread)
-    val medianValue = calculateMedian(lars.filter(rateSpreadBetween(1.5, Int.MaxValue)), loanAmount)
+    val medianValue = calculateWeightedMedian(lars.filter(rateSpreadBetween(1.5, Int.MaxValue)), combined)
 
     Future.sequence(List(medianCount, medianValue)).map { results =>
       s"""
          |{
          |    "pricing": "Median",
          |    "count": ${results.head},
-         |    "value": ${results(1).toInt}
+         |    "value": ${results(1)}
          |}
        """.stripMargin
     }
