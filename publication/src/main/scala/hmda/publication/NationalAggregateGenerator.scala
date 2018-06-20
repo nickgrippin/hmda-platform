@@ -22,13 +22,17 @@ object NationalAggregateGenerator {
   val msas = MsaIncomeLookup.values
 
   def main(args: Array[String]): Unit = {
-    val reportList: List[A5X] = List(N51)
+    val reportList: List[A7X] = List(N71)
+    var startTime = System.currentTimeMillis()
     for (report <- reportList) {
       val r = Await.result(report.generate(lars, -1), 5.hours)
       val writer = new PrintWriter(new File(s"${r.reportID}.txt"))
       writer.write(r.report)
       Thread.sleep(10000)
       writer.close()
+      val timeDif = (System.currentTimeMillis() - startTime) / 1000 / 60
+      println(s"Finished ${r.reportID} in $timeDif minutes")
+      startTime = System.currentTimeMillis()
     }
     //loadLarData(args(0).toInt)
     Thread.sleep(10000)

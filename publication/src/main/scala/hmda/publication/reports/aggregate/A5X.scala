@@ -152,7 +152,6 @@ trait A5X {
     val reportLars = filters(larSource)
       .filter(lar => lar.geographyMsa =!= "NA")
       .filter(lar => lar.applicantIncome =!= "NA")
-      .take(10000)
 
     val incomeIntervals = nationalLarsByIncomeInterval(reportLars)
 

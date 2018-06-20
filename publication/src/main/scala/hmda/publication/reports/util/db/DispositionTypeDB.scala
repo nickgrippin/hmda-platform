@@ -21,7 +21,8 @@ sealed abstract class DispositionTypeDB(
       count <- loanCountF
       total <- totalValueF
     } yield {
-      ValueDisposition(value, count, total)
+      val t = if (total < 0) 0 else total
+      ValueDisposition(value, count, t)
     }
   }
 

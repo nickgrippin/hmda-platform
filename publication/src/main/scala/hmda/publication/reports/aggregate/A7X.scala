@@ -3,17 +3,21 @@ package hmda.publication.reports.aggregate
 import akka.NotUsed
 import akka.stream.scaladsl.Source
 import hmda.census.model.{ Tract, TractLookup }
+import hmda.model.census.CBSATractLookup
 import hmda.model.fi.lar.LoanApplicationRegister
 import hmda.model.publication.reports.ValueDisposition
 import hmda.model.publication.reports.ReportTypeEnum.Aggregate
+import hmda.publication.model.LARTable
 import hmda.publication.reports._
-import hmda.publication.reports.util.CensusTractUtil._
-import hmda.publication.reports.util.DispositionType._
-import hmda.publication.reports.util.ReportUtil._
+import hmda.publication.reports.util.db.CensusTractUtilDB._
+import hmda.publication.reports.util.db.DispositionTypeDB._
+import hmda.publication.reports.util.db.ReportUtilDB._
 import hmda.publication.reports.util.ReportsMetaDataLookup
 
 import scala.concurrent.Future
-
+import slick.jdbc.PostgresProfile.api._
+import slick.lifted.TableQuery
+/*
 object A71 extends A7X {
   val reportId = "A71"
   def filters(lar: LoanApplicationRegister): Boolean = {
@@ -75,146 +79,142 @@ object A77 extends A7X {
     loan.propertyType == 2 &&
       (loan.purpose == 1 || loan.purpose == 2 || loan.purpose == 3)
   }
-}
+}*/
 
 object N71 extends A7X {
   val reportId = "N71"
-  def filters(lar: LoanApplicationRegister): Boolean = {
-    val loan = lar.loan
-    (loan.loanType == 2 || loan.loanType == 3 || loan.loanType == 4) &&
-      (loan.propertyType == 1 || loan.propertyType == 2) &&
-      loan.purpose == 1
+  def filters(lars: TableQuery[LARTable]) = {
+    lars.filter(lar => {
+      (lar.loanType === 2 || lar.loanType === 3 || lar.loanType === 4) &&
+        (lar.loanPropertyType === 1 || lar.loanPropertyType === 2) &&
+        lar.loanPurpose === 1
+    })
   }
 }
 
 object N72 extends A7X {
   val reportId = "N72"
-  def filters(lar: LoanApplicationRegister): Boolean = {
-    val loan = lar.loan
-    loan.loanType == 1 && loan.purpose == 1 &&
-      (loan.propertyType == 1 || loan.propertyType == 2)
+  def filters(lars: TableQuery[LARTable]) = {
+    lars.filter(lar => {
+      lar.loanType === 1 && lar.loanPurpose === 1 &&
+        (lar.loanPropertyType === 1 || lar.loanPropertyType === 2)
+    })
   }
 }
 
 object N73 extends A7X {
   val reportId = "N73"
-  def filters(lar: LoanApplicationRegister): Boolean = {
-    val loan = lar.loan
-    (loan.propertyType == 1 || loan.propertyType == 2) &&
-      loan.purpose == 3
+  def filters(lars: TableQuery[LARTable]) = {
+    lars.filter(lar => {
+      (lar.loanPropertyType === 1 || lar.loanPropertyType === 2) &&
+        lar.loanPurpose === 3
+    })
   }
 }
 
 object N74 extends A7X {
   val reportId = "N74"
-  def filters(lar: LoanApplicationRegister): Boolean = {
-    val loan = lar.loan
-    (loan.propertyType == 1 || loan.propertyType == 2) &&
-      loan.purpose == 2
+  def filters(lars: TableQuery[LARTable]) = {
+    lars.filter(lar => {
+      (lar.loanPropertyType === 1 || lar.loanPropertyType === 2) &&
+        lar.loanPurpose === 2
+    })
   }
 }
 
 object N75 extends A7X {
   val reportId = "N75"
-  def filters(lar: LoanApplicationRegister): Boolean = {
-    lar.loan.propertyType == 3
+  def filters(lars: TableQuery[LARTable]) = {
+    lars.filter(lar => {
+      lar.loanPropertyType === 3
+    })
   }
 }
 
 object N76 extends A7X {
   val reportId = "N76"
-  def filters(lar: LoanApplicationRegister): Boolean = {
-    val loan = lar.loan
-    loan.occupancy == 2 &&
-      (loan.purpose == 1 || loan.purpose == 2 || loan.purpose == 3) &&
-      (loan.propertyType == 1 || loan.propertyType == 2)
+  def filters(lars: TableQuery[LARTable]) = {
+    lars.filter(lar => {
+      lar.loanOccupancy === 2 &&
+        (lar.loanPurpose === 1 || lar.loanPurpose === 2 || lar.loanPurpose === 3) &&
+        (lar.loanPropertyType === 1 || lar.loanPropertyType === 2)
+    })
   }
 }
 
 object N77 extends A7X {
   val reportId = "N77"
-  def filters(lar: LoanApplicationRegister): Boolean = {
-    val loan = lar.loan
-    loan.propertyType == 2 &&
-      (loan.purpose == 1 || loan.purpose == 2 || loan.purpose == 3)
+  def filters(lars: TableQuery[LARTable]) = {
+    lars.filter(lar => {
+      lar.loanPropertyType === 2 &&
+        (lar.loanPurpose === 1 || lar.loanPurpose === 2 || lar.loanPurpose === 3)
+    })
   }
 }
 
-trait A7X extends AggregateReport {
+trait A7X {
   val reportId: String
-  def filters(lar: LoanApplicationRegister): Boolean
+  def filters(lar: TableQuery[LARTable]): Query[LARTable, LARTable#TableElementType, Seq]
 
   val dispositions = List(ApplicationReceived, LoansOriginated, ApprovedButNotAccepted,
     ApplicationsDenied, ApplicationsWithdrawn, ClosedForIncompleteness)
 
-  def geoFilter(fips: Int)(lar: LoanApplicationRegister): Boolean =
-    lar.geography.msa != "NA" &&
-      lar.geography.msa.toInt == fips
-
-  def generate[ec: EC, mat: MAT, as: AS](
-    larSource: Source[LoanApplicationRegister, NotUsed],
+  def generate[ec: EC](
+    larSource: TableQuery[LARTable],
     fipsCode: Int
   ): Future[AggregateReportPayload] = {
 
     val metaData = ReportsMetaDataLookup.values(reportId)
 
-    val lars =
-      if (metaData.reportType == Aggregate) larSource.filter(filters).filter(geoFilter(fipsCode))
-      else larSource.filter(filters)
+    val lars = filters(larSource).take(10000)
 
-    val msa: String = if (metaData.reportType == Aggregate) s""""msa": ${msaReport(fipsCode.toString).toJsonFormat},""" else ""
     val reportDate = formattedCurrentDate
-    val yearF = calculateYear(lars)
 
-    val msaTracts: Set[Tract] =
-      if (metaData.reportType == Aggregate) TractLookup.values.filter(_.msa == fipsCode.toString)
-      else TractLookup.values
+    val smallCounties = CBSATractLookup.smallCounties.map(t => s"${t._1}${t._2}")
 
-    val lowIncomeLars = filterIncomeCharacteristics(lars, 0, 50, msaTracts)
-    val moderateIncomeLars = filterIncomeCharacteristics(lars, 50, 80, msaTracts)
-    val middleIncomeLars = filterIncomeCharacteristics(lars, 80, 120, msaTracts)
-    val upperIncomeLars = filterIncomeCharacteristics(lars, 120, 1000, msaTracts)
+    val lowIncomeLars = filterIncomeCharacteristics(lars, 0, 50)
+    val moderateIncomeLars = filterIncomeCharacteristics(lars, 50, 80)
+    val middleIncomeLars = filterIncomeCharacteristics(lars, 80, 120)
+    val upperIncomeLars = filterIncomeCharacteristics(lars, 120, 1000)
 
     for {
-      year <- yearF
-
-      tractMinorityComposition1 <- dispositionsOutput(filterMinorityPopulation(lars, 0, 10, msaTracts))
-      tractMinorityComposition2 <- dispositionsOutput(filterMinorityPopulation(lars, 10, 20, msaTracts))
-      tractMinorityComposition3 <- dispositionsOutput(filterMinorityPopulation(lars, 20, 50, msaTracts))
-      tractMinorityComposition4 <- dispositionsOutput(filterMinorityPopulation(lars, 50, 80, msaTracts))
-      tractMinorityComposition5 <- dispositionsOutput(filterMinorityPopulation(lars, 80, 101, msaTracts))
+      tractMinorityComposition1 <- dispositionsOutput(filterMinorityPopulation(lars, 0, 10))
+      tractMinorityComposition2 <- dispositionsOutput(filterMinorityPopulation(lars, 10, 20))
+      tractMinorityComposition3 <- dispositionsOutput(filterMinorityPopulation(lars, 20, 50))
+      tractMinorityComposition4 <- dispositionsOutput(filterMinorityPopulation(lars, 50, 80))
+      tractMinorityComposition5 <- dispositionsOutput(filterMinorityPopulation(lars, 80, 101))
 
       lowIncome <- dispositionsOutput(lowIncomeLars)
       moderateIncome <- dispositionsOutput(moderateIncomeLars)
       middleIncome <- dispositionsOutput(middleIncomeLars)
       upperIncome <- dispositionsOutput(upperIncomeLars)
 
-      low1 <- dispositionsOutput(filterMinorityPopulation(lowIncomeLars, 0, 10, msaTracts))
-      low2 <- dispositionsOutput(filterMinorityPopulation(lowIncomeLars, 10, 20, msaTracts))
-      low3 <- dispositionsOutput(filterMinorityPopulation(lowIncomeLars, 20, 50, msaTracts))
-      low4 <- dispositionsOutput(filterMinorityPopulation(lowIncomeLars, 50, 80, msaTracts))
-      low5 <- dispositionsOutput(filterMinorityPopulation(lowIncomeLars, 80, 101, msaTracts))
+      low1 <- dispositionsOutput(filterMinorityPopulation(lowIncomeLars, 0, 10))
+      low2 <- dispositionsOutput(filterMinorityPopulation(lowIncomeLars, 10, 20))
+      low3 <- dispositionsOutput(filterMinorityPopulation(lowIncomeLars, 20, 50))
+      low4 <- dispositionsOutput(filterMinorityPopulation(lowIncomeLars, 50, 80))
+      low5 <- dispositionsOutput(filterMinorityPopulation(lowIncomeLars, 80, 101))
 
-      mod1 <- dispositionsOutput(filterMinorityPopulation(moderateIncomeLars, 0, 10, msaTracts))
-      mod2 <- dispositionsOutput(filterMinorityPopulation(moderateIncomeLars, 10, 20, msaTracts))
-      mod3 <- dispositionsOutput(filterMinorityPopulation(moderateIncomeLars, 20, 50, msaTracts))
-      mod4 <- dispositionsOutput(filterMinorityPopulation(moderateIncomeLars, 50, 80, msaTracts))
-      mod5 <- dispositionsOutput(filterMinorityPopulation(moderateIncomeLars, 80, 101, msaTracts))
+      mod1 <- dispositionsOutput(filterMinorityPopulation(moderateIncomeLars, 0, 10))
+      mod2 <- dispositionsOutput(filterMinorityPopulation(moderateIncomeLars, 10, 20))
+      mod3 <- dispositionsOutput(filterMinorityPopulation(moderateIncomeLars, 20, 50))
+      mod4 <- dispositionsOutput(filterMinorityPopulation(moderateIncomeLars, 50, 80))
+      mod5 <- dispositionsOutput(filterMinorityPopulation(moderateIncomeLars, 80, 101))
 
-      mid1 <- dispositionsOutput(filterMinorityPopulation(middleIncomeLars, 0, 10, msaTracts))
-      mid2 <- dispositionsOutput(filterMinorityPopulation(middleIncomeLars, 10, 20, msaTracts))
-      mid3 <- dispositionsOutput(filterMinorityPopulation(middleIncomeLars, 20, 50, msaTracts))
-      mid4 <- dispositionsOutput(filterMinorityPopulation(middleIncomeLars, 50, 80, msaTracts))
-      mid5 <- dispositionsOutput(filterMinorityPopulation(middleIncomeLars, 80, 101, msaTracts))
+      mid1 <- dispositionsOutput(filterMinorityPopulation(middleIncomeLars, 0, 10))
+      mid2 <- dispositionsOutput(filterMinorityPopulation(middleIncomeLars, 10, 20))
+      mid3 <- dispositionsOutput(filterMinorityPopulation(middleIncomeLars, 20, 50))
+      mid4 <- dispositionsOutput(filterMinorityPopulation(middleIncomeLars, 50, 80))
+      mid5 <- dispositionsOutput(filterMinorityPopulation(middleIncomeLars, 80, 101))
 
-      upp1 <- dispositionsOutput(filterMinorityPopulation(upperIncomeLars, 0, 10, msaTracts))
-      upp2 <- dispositionsOutput(filterMinorityPopulation(upperIncomeLars, 10, 20, msaTracts))
-      upp3 <- dispositionsOutput(filterMinorityPopulation(upperIncomeLars, 20, 50, msaTracts))
-      upp4 <- dispositionsOutput(filterMinorityPopulation(upperIncomeLars, 50, 80, msaTracts))
-      upp5 <- dispositionsOutput(filterMinorityPopulation(upperIncomeLars, 80, 101, msaTracts))
+      upp1 <- dispositionsOutput(filterMinorityPopulation(upperIncomeLars, 0, 10))
+      upp2 <- dispositionsOutput(filterMinorityPopulation(upperIncomeLars, 10, 20))
+      upp3 <- dispositionsOutput(filterMinorityPopulation(upperIncomeLars, 20, 50))
+      upp4 <- dispositionsOutput(filterMinorityPopulation(upperIncomeLars, 50, 80))
+      upp5 <- dispositionsOutput(filterMinorityPopulation(upperIncomeLars, 80, 101))
 
-      smallCty <- dispositionsOutput(filterSmallCounty(lars))
-      nonSmall <- dispositionsOutput(filterNotSmallCounty(lars))
+      smallCty <- dispositionsOutput(lars.filter(lar => lar.geographyState ++ lar.geographyCounty inSet smallCounties))
+      nonSmall <- dispositionsOutput(lars.filterNot(lar => lar.geographyState ++ lar.geographyCounty inSet smallCounties))
 
       total <- dispositionsOutput(lars)
 
@@ -224,9 +224,8 @@ trait A7X extends AggregateReport {
          |    "table": "${metaData.reportTable}",
          |    "type": "${metaData.reportType}",
          |    "description": "${metaData.description}",
-         |    "year": "$year",
+         |    "year": "2017",
          |    "reportDate": "$reportDate",
-         |    $msa
          |    "censusTractCharacteristics": [
          |        {
          |            "characteristic": "Racial/Ethnic Composition",
@@ -402,7 +401,7 @@ trait A7X extends AggregateReport {
     }
   }
 
-  private def dispositionsOutput[ec: EC, mat: MAT, as: AS](larSource: Source[LoanApplicationRegister, NotUsed]): Future[String] = {
+  private def dispositionsOutput[ec: EC](larSource: Query[LARTable, LARTable#TableElementType, Seq]): Future[String] = {
     val calculatedDispositions: Future[List[ValueDisposition]] = Future.sequence(
       dispositions.map(_.calculateValueDisposition(larSource))
     )
@@ -411,5 +410,4 @@ trait A7X extends AggregateReport {
       list.map(disp => disp.toJsonFormat).mkString("[", ",", "]")
     }
   }
-
 }
