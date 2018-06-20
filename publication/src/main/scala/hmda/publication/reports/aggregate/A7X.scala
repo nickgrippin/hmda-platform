@@ -166,7 +166,7 @@ trait A7X {
 
     val metaData = ReportsMetaDataLookup.values(reportId)
 
-    val lars = filters(larSource).take(10000)
+    val lars = filters(larSource)
 
     val reportDate = formattedCurrentDate
 

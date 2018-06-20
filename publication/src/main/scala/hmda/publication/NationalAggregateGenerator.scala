@@ -6,6 +6,7 @@ import hmda.census.model._
 import hmda.parser.fi.lar.LarCsvParser
 import hmda.publication.model._
 import hmda.publication.reports.aggregate._
+import hmda.publication.reports.util.db.ReportUtilDB._
 import slick.jdbc.PostgresProfile.api._
 
 import scala.concurrent.{ Await, ExecutionContext }
@@ -22,7 +23,7 @@ object NationalAggregateGenerator {
   val msas = MsaIncomeLookup.values
 
   def main(args: Array[String]): Unit = {
-    val reportList: List[A7X] = List(N71)
+    val reportList: List[A7X] = List(N71, N72, N73, N74, N75, N76, N77)
     var startTime = System.currentTimeMillis()
     for (report <- reportList) {
       val r = Await.result(report.generate(lars, -1), 5.hours)
@@ -31,7 +32,7 @@ object NationalAggregateGenerator {
       Thread.sleep(10000)
       writer.close()
       val timeDif = (System.currentTimeMillis() - startTime) / 1000 / 60
-      println(s"Finished ${r.reportID} in $timeDif minutes")
+      println(s"Finished ${r.reportID} in $timeDif minutes on $formattedCurrentDate")
       startTime = System.currentTimeMillis()
     }
     //loadLarData(args(0).toInt)
