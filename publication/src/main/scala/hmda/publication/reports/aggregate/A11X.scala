@@ -1,8 +1,5 @@
 package hmda.publication.reports.aggregate
 
-import akka.NotUsed
-import akka.stream.scaladsl.Source
-import hmda.census.model.{ Tract, TractLookup }
 import hmda.model.fi.lar.LoanApplicationRegister
 import hmda.model.publication.reports.EthnicityEnum._
 import hmda.model.publication.reports.GenderEnum.{ Female, GenderNotAvailable, JointGender, Male }
@@ -11,8 +8,8 @@ import hmda.model.publication.reports.MinorityStatusEnum._
 import hmda.model.publication.reports.RaceEnum._
 import hmda.model.publication.reports.ReportTypeEnum.Aggregate
 import hmda.publication.model.LARTable
-import hmda.publication.reports.util.CensusTractUtil._
-import hmda.publication.reports.{ AS, EC, MAT }
+import hmda.publication.reports.util.db.CensusTractUtilDB._
+import hmda.publication.reports.EC
 import hmda.publication.reports.util.db.EthnicityUtilDB.filterEthnicity
 import hmda.publication.reports.util.db.GenderUtilDB.filterGender
 import hmda.publication.reports.util.db.MinorityStatusUtilDB.filterMinorityStatus
@@ -217,8 +214,6 @@ trait A11X {
 
     val reportDate = formattedCurrentDate
 
-    val msaTracts: Set[Tract] = TractLookup.values
-
     for {
       e1 <- pricingData(filterEthnicity(lars, HispanicOrLatino))
       e2 <- pricingData(filterEthnicity(lars, NotHispanicOrLatino))
@@ -249,16 +244,16 @@ trait A11X {
       i5 <- pricingData(incomeIntervals(GreaterThan120PercentOfMSAMedian))
       i6 <- pricingData(lars.filter(lar => lar.applicantIncome === "NA"))
 
-      tractMinorityComposition1 <- pricingData(filterMinorityPopulation(lars, 0, 10, msaTracts))
-      tractMinorityComposition2 <- pricingData(filterMinorityPopulation(lars, 10, 20, msaTracts))
-      tractMinorityComposition3 <- pricingData(filterMinorityPopulation(lars, 20, 50, msaTracts))
-      tractMinorityComposition4 <- pricingData(filterMinorityPopulation(lars, 50, 80, msaTracts))
-      tractMinorityComposition5 <- pricingData(filterMinorityPopulation(lars, 80, 101, msaTracts))
+      tractMinorityComposition1 <- pricingData(filterMinorityPopulation(lars, 0, 10))
+      tractMinorityComposition2 <- pricingData(filterMinorityPopulation(lars, 10, 20))
+      tractMinorityComposition3 <- pricingData(filterMinorityPopulation(lars, 20, 50))
+      tractMinorityComposition4 <- pricingData(filterMinorityPopulation(lars, 50, 80))
+      tractMinorityComposition5 <- pricingData(filterMinorityPopulation(lars, 80, 101))
 
-      tractIncome1 <- pricingData(filterIncomeCharacteristics(lars, 0, 50, msaTracts))
-      tractIncome2 <- pricingData(filterIncomeCharacteristics(lars, 50, 80, msaTracts))
-      tractIncome3 <- pricingData(filterIncomeCharacteristics(lars, 80, 120, msaTracts))
-      tractIncome4 <- pricingData(filterIncomeCharacteristics(lars, 120, 1000, msaTracts))
+      tractIncome1 <- pricingData(filterIncomeCharacteristics(lars, 0, 50))
+      tractIncome2 <- pricingData(filterIncomeCharacteristics(lars, 50, 80))
+      tractIncome3 <- pricingData(filterIncomeCharacteristics(lars, 80, 120))
+      tractIncome4 <- pricingData(filterIncomeCharacteristics(lars, 120, 1000))
 
     } yield {
       val report = s"""

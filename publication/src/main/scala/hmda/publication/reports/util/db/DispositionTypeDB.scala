@@ -160,7 +160,7 @@ object DispositionTypeDB {
   )
   case object TotalDenied extends DispositionTypeDB(
     "Total",
-    _.denialReason1 != ""
+    _.denialReason1 =!= ""
   )
 
   //////////////////////////////////

@@ -1,24 +1,25 @@
 package hmda.publication.reports.aggregate
 
 import hmda.publication.reports.util.ReportsMetaDataLookup
-import hmda.publication.reports.util.ReportUtil._
-import akka.NotUsed
-import akka.stream.scaladsl.Source
-import hmda.model.fi.lar.LoanApplicationRegister
+import hmda.publication.reports.util.db.ReportUtilDB._
 import hmda.model.publication.reports.ApplicantIncomeEnum._
 import hmda.model.publication.reports.EthnicityEnum.{ HispanicOrLatino, JointEthnicity, NotAvailable, NotHispanicOrLatino }
 import hmda.model.publication.reports.MinorityStatusEnum.{ OtherIncludingHispanic, WhiteNonHispanic }
 import hmda.model.publication.reports.RaceEnum._
 import hmda.model.publication.reports.ReportTypeEnum.{ Aggregate, NationalAggregate }
 import hmda.model.publication.reports.ValueDisposition
+import hmda.publication.model.LARTable
 import hmda.publication.reports._
-import hmda.publication.reports.util.DispositionType._
-import hmda.publication.reports.util.EthnicityUtil.filterEthnicity
-import hmda.publication.reports.util.MinorityStatusUtil.filterMinorityStatus
-import hmda.publication.reports.util.RaceUtil.filterRace
+import hmda.publication.reports.util.db.DispositionTypeDB._
+import hmda.publication.reports.util.db.EthnicityUtilDB.filterEthnicity
+import hmda.publication.reports.util.db.MinorityStatusUtilDB.filterMinorityStatus
+import hmda.publication.reports.util.db.RaceUtilDB.filterRace
 
 import scala.concurrent.Future
+import slick.jdbc.PostgresProfile.api._
+import slick.lifted.TableQuery
 
+/*
 object A51 extends A5X {
   val reportId = "A51"
   def filters(lar: LoanApplicationRegister): Boolean = {
@@ -70,95 +71,94 @@ object A57 extends A5X {
     loan.propertyType == 2 &&
       (loan.purpose == 1 || loan.purpose == 2 || loan.purpose == 3)
   }
-}
+}*/
 
 object N51 extends A5X {
   val reportId = "N51"
-  def filters(lar: LoanApplicationRegister): Boolean = {
-    (lar.loan.loanType == 2 || lar.loan.loanType == 3 || lar.loan.loanType == 4) &&
-      (lar.loan.propertyType == 1 || lar.loan.propertyType == 2) &&
-      (lar.loan.purpose == 1)
+  def filters(lars: TableQuery[LARTable]) = {
+    lars.filter(lar => {
+      (lar.loanType === 2 || lar.loanType === 3 || lar.loanType === 4) &&
+        (lar.loanPropertyType === 1 || lar.loanPropertyType === 2) &&
+        (lar.loanPurpose === 1)
+    })
   }
 }
 
 object N52 extends A5X {
   val reportId = "N52"
-  def filters(lar: LoanApplicationRegister): Boolean = {
-    (lar.loan.loanType == 1) &&
-      (lar.loan.propertyType == 1 || lar.loan.propertyType == 2) &&
-      (lar.loan.purpose == 1)
+  def filters(lars: TableQuery[LARTable]) = {
+    lars.filter(lar => {
+      (lar.loanType === 1) &&
+        (lar.loanPropertyType === 1 || lar.loanPropertyType === 2) &&
+        (lar.loanPurpose === 1)
+    })
   }
 }
 
 object N53 extends A5X {
   val reportId = "N53"
-  def filters(lar: LoanApplicationRegister): Boolean = {
-    (lar.loan.propertyType == 1 || lar.loan.propertyType == 2) &&
-      (lar.loan.purpose == 3)
+  def filters(lars: TableQuery[LARTable]) = {
+    lars.filter(lar => {
+      (lar.loanPropertyType === 1 || lar.loanPropertyType === 2) &&
+        (lar.loanPurpose === 3)
+    })
   }
 }
 
 object N54 extends A5X {
   val reportId = "N54"
-  def filters(lar: LoanApplicationRegister): Boolean = {
-    (lar.loan.propertyType == 1 || lar.loan.propertyType == 2) &&
-      (lar.loan.purpose == 2)
+  def filters(lars: TableQuery[LARTable]) = {
+    lars.filter(lar => {
+      (lar.loanPropertyType === 1 || lar.loanPropertyType === 2) &&
+        (lar.loanPurpose === 2)
+    })
   }
 }
 
 object N56 extends A5X {
   val reportId = "N56"
-  def filters(lar: LoanApplicationRegister): Boolean = {
-    val loan = lar.loan
-    loan.occupancy == 2 &&
-      (loan.propertyType == 1 || loan.propertyType == 2) &&
-      (loan.purpose == 1 || loan.purpose == 2 || loan.purpose == 3)
+  def filters(lars: TableQuery[LARTable]) = {
+    lars.filter(lar => {
+      lar.loanOccupancy === 2 &&
+        (lar.loanPropertyType === 1 || lar.loanPropertyType === 2) &&
+        (lar.loanPurpose === 1 || lar.loanPurpose === 2 || lar.loanPurpose === 3)
+    })
   }
 }
 
 object N57 extends A5X {
   val reportId = "N57"
-  def filters(lar: LoanApplicationRegister): Boolean = {
-    val loan = lar.loan
-    loan.propertyType == 2 &&
-      (loan.purpose == 1 || loan.purpose == 2 || loan.purpose == 3)
+  def filters(lars: TableQuery[LARTable]) = {
+    lars.filter(lar => {
+      lar.loanPropertyType === 2 &&
+        (lar.loanPurpose === 1 || lar.loanPurpose === 2 || lar.loanPurpose === 3)
+    })
   }
 }
 
-trait A5X extends AggregateReport {
+trait A5X {
   val reportId: String
-  def filters(lar: LoanApplicationRegister): Boolean
+  def filters(lar: TableQuery[LARTable]): Query[LARTable, LARTable#TableElementType, Seq]
   val dispositions = List(ApplicationReceived, LoansOriginated, ApprovedButNotAccepted,
     ApplicationsDenied, ApplicationsWithdrawn, ClosedForIncompleteness)
 
-  override def generate[ec: EC, mat: MAT, as: AS](
-    larSource: Source[LoanApplicationRegister, NotUsed],
+  def generate[ec: EC](
+    larSource: TableQuery[LARTable],
     fipsCode: Int
   ): Future[AggregateReportPayload] = {
 
     val metaData = ReportsMetaDataLookup.values(reportId)
 
-    val larsInitialFilters = larSource
-      .filter(lar => lar.geography.msa != "NA")
-      .filter(lar => lar.applicant.income != "NA")
-      .filter(filters)
+    val reportLars = filters(larSource)
+      .filter(lar => lar.geographyMsa =!= "NA")
+      .filter(lar => lar.applicantIncome =!= "NA")
+      .take(10000)
 
-    val reportLars =
-      if (metaData.reportType == NationalAggregate) larsInitialFilters
-      else larsInitialFilters.filter(_.geography.msa.toInt == fipsCode)
+    val incomeIntervals = nationalLarsByIncomeInterval(reportLars)
 
-    val msa: String = if (metaData.reportType == Aggregate) s""""msa": ${msaReport(fipsCode.toString).toJsonFormat},""" else ""
-
-    val incomeIntervals =
-      if (metaData.reportType == Aggregate) larsByIncomeInterval(reportLars, calculateMedianIncomeIntervals(fipsCode))
-      else nationalLarsByIncomeInterval(reportLars)
-
-    val yearF = calculateYear(larSource)
     val reportDate = formattedCurrentDate
 
     for {
-      year <- yearF
-
       ri1 <- raceDispositions(incomeIntervals(LessThan50PercentOfMSAMedian))
       ei1 <- ethnicityDispositions(incomeIntervals(LessThan50PercentOfMSAMedian))
       mi1 <- minorityStatusDispositions(incomeIntervals(LessThan50PercentOfMSAMedian))
@@ -188,9 +188,8 @@ trait A5X extends AggregateReport {
            |    "table": "${metaData.reportTable}",
            |    "type": "${metaData.reportType}",
            |    "description": "${metaData.description}",
-           |    "year": "$year",
+           |    "year": "2017",
            |    "reportDate": "$reportDate",
-           |    $msa
            |    "applicantIncomes": [
            |        {
            |            "applicantIncome": "Less than 50% of MSA/MD median",
@@ -289,7 +288,7 @@ trait A5X extends AggregateReport {
 
   }
 
-  private def raceDispositions[ec: EC, mat: MAT, as: AS](larSource: Source[LoanApplicationRegister, NotUsed]): Future[String] = {
+  private def raceDispositions[ec: EC](larSource: Query[LARTable, LARTable#TableElementType, Seq]): Future[String] = {
     val races = List(AmericanIndianOrAlaskaNative, Asian, BlackOrAfricanAmerican,
       HawaiianOrPacific, White, TwoOrMoreMinority, JointRace, NotProvided)
 
@@ -308,7 +307,7 @@ trait A5X extends AggregateReport {
 
     raceOutputs.map { list => list.mkString("[", ",", "]") }
   }
-  private def ethnicityDispositions[ec: EC, mat: MAT, as: AS](larSource: Source[LoanApplicationRegister, NotUsed]): Future[String] = {
+  private def ethnicityDispositions[ec: EC](larSource: Query[LARTable, LARTable#TableElementType, Seq]): Future[String] = {
     val ethnicities = List(HispanicOrLatino, NotHispanicOrLatino, JointEthnicity, NotAvailable)
 
     val ethnicityOutputs: Future[List[String]] = Future.sequence(
@@ -326,7 +325,7 @@ trait A5X extends AggregateReport {
 
     ethnicityOutputs.map { list => list.mkString("[", ",", "]") }
   }
-  private def minorityStatusDispositions[ec: EC, mat: MAT, as: AS](larSource: Source[LoanApplicationRegister, NotUsed]): Future[String] = {
+  private def minorityStatusDispositions[ec: EC](larSource: Query[LARTable, LARTable#TableElementType, Seq]): Future[String] = {
     val minorityStatuses = List(WhiteNonHispanic, OtherIncludingHispanic)
 
     val minorityStatusOutputs: Future[List[String]] = Future.sequence(
@@ -345,7 +344,7 @@ trait A5X extends AggregateReport {
     minorityStatusOutputs.map { list => list.mkString("[", ",", "]") }
   }
 
-  private def dispositionsOutput[ec: EC, mat: MAT, as: AS](larSource: Source[LoanApplicationRegister, NotUsed]): Future[String] = {
+  private def dispositionsOutput[ec: EC](larSource: Query[LARTable, LARTable#TableElementType, Seq]): Future[String] = {
     val calculatedDispositions: Future[List[ValueDisposition]] = Future.sequence(
       dispositions.map(_.calculateValueDisposition(larSource))
     )

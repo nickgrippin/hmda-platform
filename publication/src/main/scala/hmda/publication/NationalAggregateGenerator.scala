@@ -22,7 +22,7 @@ object NationalAggregateGenerator {
   val msas = MsaIncomeLookup.values
 
   def main(args: Array[String]): Unit = {
-    val reportList: List[A8X] = List(N82, N83, N84, N85, N86, N87)
+    val reportList: List[A5X] = List(N51)
     for (report <- reportList) {
       val r = Await.result(report.generate(lars, -1), 5.hours)
       val writer = new PrintWriter(new File(s"${r.reportID}.txt"))

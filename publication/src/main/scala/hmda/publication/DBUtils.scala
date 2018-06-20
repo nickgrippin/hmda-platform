@@ -1,6 +1,5 @@
 package hmda.publication
 
-import akka.NotUsed
 import hmda._
 import hmda.publication.model.LARTable
 
@@ -24,7 +23,6 @@ trait DBUtils {
     } yield r
     db.run(q).map(opt => opt.getOrElse(-1))
   }
-
 
   def sumRateSpread[ec: EC](input: Query[LARTable, LARTable#TableElementType, Seq]): Future[Double] = {
     val q = for {

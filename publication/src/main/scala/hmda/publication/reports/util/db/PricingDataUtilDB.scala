@@ -66,31 +66,35 @@ object PricingDataUtilDB extends DBUtils {
     }
   }
 
-  private def reportedMean[ec: EC, mat: MAT, as: AS](lars: Query[LARTable, LARTable#TableElementType, Seq]): Future[String] = {
-    val meanCount = calculateMean(lars, rateSpread)
-    val meanValue = calculateMean(lars, loanAmount)
+  private def reportedMean[ec: EC](lars: Query[LARTable, LARTable#TableElementType, Seq]): Future[String] = {
+    val meanCount = calculateMean(lars)
+    val meanValue = calculateWeightedMean(lars)
 
-    Future.sequence(List(meanCount, meanValue)).map { results =>
+    for {
+      mC <- meanCount
+      mV <- meanValue
+    } yield {
+      val roundWeighted = BigDecimal(mV * 100).setScale(2, BigDecimal.RoundingMode.HALF_UP).toDouble
       s"""
          |{
          |    "pricing": "Mean",
-         |    "count": ${results.head},
-         |    "value": ${results(1).toInt}
+         |    "count": $mC,
+         |    "value": $roundWeighted
          |}
        """.stripMargin
     }
   }
 
-  private def reportedMedian[ec: EC, mat: MAT, as: AS](lars: Query[LARTable, LARTable#TableElementType, Seq]): Future[String] = {
-    val medianCount = calculateMedian(lars.filter(rateSpreadBetween(1.5, Int.MaxValue)), rateSpread)
-    val medianValue = calculateMedian(lars.filter(rateSpreadBetween(1.5, Int.MaxValue)), loanAmount)
+  private def reportedMedian[ec: EC](lars: Query[LARTable, LARTable#TableElementType, Seq]): Future[String] = {
+    val medianCount = calculateMedian(lars)
+    val medianValue = calculateWeightedMedian(lars)
 
     Future.sequence(List(medianCount, medianValue)).map { results =>
       s"""
          |{
          |    "pricing": "Median",
          |    "count": ${results.head},
-         |    "value": ${results(1).toInt}
+         |    "value": ${results(1)}
          |}
        """.stripMargin
     }

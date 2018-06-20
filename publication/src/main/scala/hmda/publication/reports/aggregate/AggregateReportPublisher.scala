@@ -78,7 +78,7 @@ class AggregateReportPublisher extends HmdaActor with LoanApplicationRegisterCas
     N31,
     N32,
     //N41, N42, N43, N44, N45, N46, N47,
-    N51, N52, N53, N54, N56, N57,
+    //N51, N52, N53, N54, N56, N57,
     N71, N72, N73, N74, N75, N76, N77,
     //N81, N82, N83, N84, N85, N86, N87,
     N9,
