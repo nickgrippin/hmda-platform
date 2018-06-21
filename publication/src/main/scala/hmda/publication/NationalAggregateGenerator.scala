@@ -23,7 +23,7 @@ object NationalAggregateGenerator {
   val msas = MsaIncomeLookup.values
 
   def main(args: Array[String]): Unit = {
-    val reportList: List[A7X] = List(N71, N72, N73, N74, N75, N76, N77)
+    val reportList = List(N12_2)
     var startTime = System.currentTimeMillis()
     for (report <- reportList) {
       val r = Await.result(report.generate(lars, -1), 5.hours)

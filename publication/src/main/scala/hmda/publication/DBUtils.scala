@@ -95,9 +95,13 @@ trait DBUtils {
   }
 
   def calculateMedian(seq: Seq[Double]): Double = {
-    val (lowerHalf, upperHalf) = seq.sortWith(_ < _).splitAt(seq.size / 2)
-    val median = if (seq.size % 2 == 0) (lowerHalf.last + upperHalf.head) / 2.0 else upperHalf.head
-    BigDecimal(median).setScale(2, BigDecimal.RoundingMode.HALF_UP).toDouble
+    if (seq.isEmpty) 0.0
+    else if (seq.size == 1) BigDecimal(seq.head).setScale(2, BigDecimal.RoundingMode.HALF_UP).toDouble
+    else {
+      val (lowerHalf, upperHalf) = seq.sortWith(_ < _).splitAt(seq.size / 2)
+      val median = if (seq.size % 2 == 0) (lowerHalf.last + upperHalf.head) / 2.0 else upperHalf.head
+      BigDecimal(median).setScale(2, BigDecimal.RoundingMode.HALF_UP).toDouble
+    }
   }
 
   def calculateWeightedMedian[ec: EC](source: Query[LARTable, LARTable#TableElementType, Seq]): Future[Double] = {

@@ -2,7 +2,6 @@ package hmda.publication.reports.util.db
 
 import akka.NotUsed
 import akka.stream.scaladsl.Source
-import hmda.census.model.{ Tract, TractLookup }
 import hmda.model.census.CBSATractLookup
 import hmda.model.fi.lar.LoanApplicationRegister
 import hmda.publication.model.LARTable
@@ -22,17 +21,8 @@ object CensusTractUtilDB {
     lars.filter(lar => lar.medianYearBuilt >= lower && lar.medianYearBuilt < upper)
   }
 
-  def filterUnknownMedianYearBuilt(lars: Source[LoanApplicationRegister, NotUsed], tracts: Set[Tract]): Source[LoanApplicationRegister, NotUsed] = {
-    lars.filter { lar =>
-      TractLookup.forLar(lar, tracts) match {
-        case Some(tract) =>
-          tract.medianYearHomesBuilt match {
-            case None => true
-            case _ => false
-          }
-        case _ => true
-      }
-    }
+  def filterUnknownMedianYearBuilt(lars: Query[LARTable, LARTable#TableElementType, Seq]): Query[LARTable, LARTable#TableElementType, Seq] = {
+    lars.filter { lar => lar.medianYearBuilt < 0 }
   }
 
   def filterSmallCounty(lars: Source[LoanApplicationRegister, NotUsed]): Source[LoanApplicationRegister, NotUsed] = {

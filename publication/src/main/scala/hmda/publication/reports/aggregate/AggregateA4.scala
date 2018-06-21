@@ -1,9 +1,5 @@
 package hmda.publication.reports.aggregate
 
-import akka.NotUsed
-import akka.stream.scaladsl.Source
-import hmda.census.model.{ Tract, TractLookup }
-import hmda.model.fi.lar.LoanApplicationRegister
 import hmda.model.publication.reports.ApplicantIncomeEnum._
 import hmda.model.publication.reports.EthnicityEnum._
 import hmda.model.publication.reports.GenderEnum._
@@ -11,67 +7,56 @@ import hmda.model.publication.reports.MinorityStatusEnum._
 import hmda.model.publication.reports.RaceEnum._
 import hmda.model.publication.reports.ReportTypeEnum.Aggregate
 import hmda.model.publication.reports.ValueDisposition
+import hmda.publication.model.LARTable
 import hmda.publication.reports._
-import hmda.publication.reports.util.CensusTractUtil._
-import hmda.publication.reports.util.DispositionType.{ PreApprovalsDenied, PreapprovalsNotAccepted, PreapprovalsToOriginations }
-import hmda.publication.reports.util.EthnicityUtil.filterEthnicity
-import hmda.publication.reports.util.GenderUtil.filterGender
-import hmda.publication.reports.util.MinorityStatusUtil.filterMinorityStatus
-import hmda.publication.reports.util.RaceUtil.filterRace
-import hmda.publication.reports.util.ReportUtil._
+import hmda.publication.reports.util.db.CensusTractUtilDB._
+import hmda.publication.reports.util.db.DispositionTypeDB._
+import hmda.publication.reports.util.db.EthnicityUtilDB.filterEthnicity
+import hmda.publication.reports.util.db.GenderUtilDB.filterGender
+import hmda.publication.reports.util.db.MinorityStatusUtilDB.filterMinorityStatus
+import hmda.publication.reports.util.db.RaceUtilDB.filterRace
+import hmda.publication.reports.util.db.ReportUtilDB._
 import hmda.publication.reports.util.ReportsMetaDataLookup
 
 import scala.concurrent.Future
+import slick.jdbc.PostgresProfile.api._
+import slick.lifted.TableQuery
 
+/*
 object AggregateA4 extends AggregateA4X {
   override val reportId = "A_A4"
-}
+}*/
 
 object NationalAggregateA4 extends AggregateA4X {
   override val reportId = "N_A4"
 }
 
-trait AggregateA4X extends AggregateReport {
+trait AggregateA4X {
   val reportId: String
-  def filters(lar: LoanApplicationRegister): Boolean = {
-    val loan = lar.loan
-    loan.loanType == 1 && loan.purpose == 1 && lar.lienStatus == 1 &&
-      loan.propertyType == 1
+  def filters(lars: TableQuery[LARTable]): Query[LARTable, LARTable#TableElementType, Seq] = {
+    lars.filter(lar => {
+      lar.loanType === 1 && lar.loanPurpose === 1 && lar.lienStatus === 1 &&
+        lar.loanPropertyType === 1
+    })
   }
 
   val dispositions = List(PreapprovalsToOriginations, PreapprovalsNotAccepted, PreApprovalsDenied)
 
-  def generate[ec: EC, mat: MAT, as: AS](
-    larSource: Source[LoanApplicationRegister, NotUsed],
+  def generate[ec: EC](
+    larSource: TableQuery[LARTable],
     fipsCode: Int
   ): Future[AggregateReportPayload] = {
 
     val metaData = ReportsMetaDataLookup.values(reportId)
 
-    def geoFilter(fips: Int)(lar: LoanApplicationRegister): Boolean =
-      lar.geography.msa != "NA" &&
-        lar.geography.msa.toInt == fips
+    val lars = filters(larSource)
 
-    val lars =
-      if (metaData.reportType == Aggregate) larSource.filter(filters).filter(geoFilter(fipsCode))
-      else larSource.filter(filters)
+    val larsForIncomeCalculation = lars.filter(lar => lar.applicantIncome =!= "NA")
+    val incomeIntervals = nationalLarsByIncomeInterval(larsForIncomeCalculation)
 
-    val larsForIncomeCalculation = lars.filter(lar => lar.applicant.income != "NA" && lar.geography.msa != "NA")
-    val incomeIntervals =
-      if (metaData.reportType == Aggregate) larsByIncomeInterval(larsForIncomeCalculation, calculateMedianIncomeIntervals(fipsCode))
-      else nationalLarsByIncomeInterval(larsForIncomeCalculation)
-
-    val msa: String = if (metaData.reportType == Aggregate) s""""msa": ${msaReport(fipsCode.toString).toJsonFormat},""" else ""
     val reportDate = formattedCurrentDate
-    val yearF = calculateYear(lars)
-
-    val msaTracts: Set[Tract] =
-      if (metaData.reportType == Aggregate) TractLookup.values.filter(_.msa == fipsCode.toString)
-      else TractLookup.values
 
     for {
-      year <- yearF
-
       e1 <- dispositionsOutput(filterEthnicity(lars, HispanicOrLatino))
       e2 <- dispositionsOutput(filterEthnicity(lars, NotHispanicOrLatino))
       e3 <- dispositionsOutput(filterEthnicity(lars, JointEthnicity))
@@ -99,18 +84,18 @@ trait AggregateA4X extends AggregateReport {
       i3 <- dispositionsOutput(incomeIntervals(Between80And99PercentOfMSAMedian))
       i4 <- dispositionsOutput(incomeIntervals(Between100And119PercentOfMSAMedian))
       i5 <- dispositionsOutput(incomeIntervals(GreaterThan120PercentOfMSAMedian))
-      i6 <- dispositionsOutput(lars.filter(lar => lar.applicant.income == "NA"))
+      i6 <- dispositionsOutput(lars.filter(lar => lar.applicantIncome === "NA"))
 
-      tractMinorityComposition1 <- dispositionsOutput(filterMinorityPopulation(lars, 0, 10, msaTracts))
-      tractMinorityComposition2 <- dispositionsOutput(filterMinorityPopulation(lars, 10, 20, msaTracts))
-      tractMinorityComposition3 <- dispositionsOutput(filterMinorityPopulation(lars, 20, 50, msaTracts))
-      tractMinorityComposition4 <- dispositionsOutput(filterMinorityPopulation(lars, 50, 80, msaTracts))
-      tractMinorityComposition5 <- dispositionsOutput(filterMinorityPopulation(lars, 80, 101, msaTracts))
+      tractMinorityComposition1 <- dispositionsOutput(filterMinorityPopulation(lars, 0, 10))
+      tractMinorityComposition2 <- dispositionsOutput(filterMinorityPopulation(lars, 10, 20))
+      tractMinorityComposition3 <- dispositionsOutput(filterMinorityPopulation(lars, 20, 50))
+      tractMinorityComposition4 <- dispositionsOutput(filterMinorityPopulation(lars, 50, 80))
+      tractMinorityComposition5 <- dispositionsOutput(filterMinorityPopulation(lars, 80, 101))
 
-      tractIncome1 <- dispositionsOutput(filterIncomeCharacteristics(lars, 0, 50, msaTracts))
-      tractIncome2 <- dispositionsOutput(filterIncomeCharacteristics(lars, 50, 80, msaTracts))
-      tractIncome3 <- dispositionsOutput(filterIncomeCharacteristics(lars, 80, 120, msaTracts))
-      tractIncome4 <- dispositionsOutput(filterIncomeCharacteristics(lars, 120, 1000, msaTracts))
+      tractIncome1 <- dispositionsOutput(filterIncomeCharacteristics(lars, 0, 50))
+      tractIncome2 <- dispositionsOutput(filterIncomeCharacteristics(lars, 50, 80))
+      tractIncome3 <- dispositionsOutput(filterIncomeCharacteristics(lars, 80, 120))
+      tractIncome4 <- dispositionsOutput(filterIncomeCharacteristics(lars, 120, 1000))
 
     } yield {
       val report = s"""
@@ -118,9 +103,8 @@ trait AggregateA4X extends AggregateReport {
        |    "table": "${metaData.reportTable}",
        |    "type": "${metaData.reportType}",
        |    "description": "${metaData.description}",
-       |    "year": "$year",
+       |    "year": "2017",
        |    "reportDate": "$reportDate",
-       |    $msa
        |    "borrowerCharacteristics": [
        |        {
        |            "characteristic": "Race",
@@ -301,7 +285,7 @@ trait AggregateA4X extends AggregateReport {
     }
   }
 
-  private def dispositionsOutput[ec: EC, mat: MAT, as: AS](larSource: Source[LoanApplicationRegister, NotUsed]): Future[String] = {
+  private def dispositionsOutput[ec: EC](larSource: Query[LARTable, LARTable#TableElementType, Seq]): Future[String] = {
     val calculatedDispositions: Future[List[ValueDisposition]] = Future.sequence(
       dispositions.map(_.calculateValueDisposition(larSource))
     )

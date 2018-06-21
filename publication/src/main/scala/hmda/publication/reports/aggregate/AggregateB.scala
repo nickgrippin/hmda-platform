@@ -4,75 +4,66 @@ import akka.NotUsed
 import akka.stream.scaladsl.{ Sink, Source }
 import hmda.model.fi.lar.LoanApplicationRegister
 import hmda.model.publication.reports.ReportTypeEnum.Aggregate
+import hmda.publication.model.LARTable
 import hmda.publication.reports._
-import hmda.publication.reports.util.PricingDataUtil.{ calculateMedian, pricingDataReported, rateSpread }
-import hmda.publication.reports.util.ReportUtil._
+import hmda.publication.reports.util.db.ReportUtilDB._
 import hmda.publication.reports.util.ReportsMetaDataLookup
 
 import scala.concurrent.Future
+import slick.jdbc.PostgresProfile.api._
+import slick.lifted.TableQuery
 
+/*
 object AggregateB extends AggregateBX {
   override val reportId: String = "A_B"
-}
+}*/
 
 object NationalAggregateB extends AggregateBX {
   override val reportId: String = "N_B"
 }
 
-trait AggregateBX extends AggregateReport {
+trait AggregateBX {
   val reportId: String
-  def filters(lar: LoanApplicationRegister): Boolean = {
-    lar.loan.loanType == 1 && lar.loan.occupancy == 1
+  def filters(lars: TableQuery[LARTable]): Query[LARTable, LARTable#TableElementType, Seq] = {
+    lars.filter(lar => lar.loanType === 1 && lar.loanOccupancy === 1)
   }
 
-  def geoFilter(fips: Int)(lar: LoanApplicationRegister): Boolean =
-    lar.geography.msa != "NA" &&
-      lar.geography.msa.toInt == fips
-
-  def generate[ec: EC, mat: MAT, as: AS](
-    larSource: Source[LoanApplicationRegister, NotUsed],
+  def generate[ec: EC](
+    larSource: TableQuery[LARTable],
     fipsCode: Int
   ): Future[AggregateReportPayload] = {
 
     val metaData = ReportsMetaDataLookup.values(reportId)
 
-    val lars =
-      if (metaData.reportType == Aggregate) larSource.filter(filters).filter(geoFilter(fipsCode))
-      else larSource.filter(filters)
+    val lars = filters(larSource)
 
-    val singleFamily = lars.filter(lar => lar.loan.propertyType == 1)
-    val manufactured = lars.filter(lar => lar.loan.propertyType == 2)
-
-    val msa: String = if (metaData.reportType == Aggregate) s""""msa": ${msaReport(fipsCode.toString).toJsonFormat},""" else ""
+    val singleFamily = lars.filter(lar => lar.loanPropertyType === 1)
+    val manufactured = lars.filter(lar => lar.loanPropertyType === 2)
 
     val reportDate = formattedCurrentDate
-    val yearF = calculateYear(lars)
 
     for {
-      singleFamilyP1 <- purposes(singleFamily.filter(_.rateSpread == "NA"), counts)
-      singleFamilyP2 <- purposes(singleFamily.filter(pricingDataReported), counts)
-      singleFamilyH1 <- purposes(singleFamily.filter(_.hoepaStatus == 1), counts)
-      singleFamilyH2 <- purposes(singleFamily.filter(_.hoepaStatus == 2), counts)
-      singleFamilyM1 <- purposes(singleFamily, rateSpreadMean)
-      singleFamilyM2 <- purposes(singleFamily, rateSpreadMedian)
+      singleFamilyP1 <- purposes(singleFamily.filter(_.rateSpread === "NA"), countToString)
+      singleFamilyP2 <- purposes(singleFamily.filter(_.rateSpread =!= "NA"), countToString)
+      singleFamilyH1 <- purposes(singleFamily.filter(_.hoepaStatus === 1), countToString)
+      singleFamilyH2 <- purposes(singleFamily.filter(_.hoepaStatus === 2), countToString)
+      singleFamilyM1 <- purposes(singleFamily.filter(_.rateSpread =!= "NA"), meanToString)
+      singleFamilyM2 <- purposes(singleFamily.filter(_.rateSpread =!= "NA"), medianToString)
 
-      manufacturedP1 <- purposes(manufactured.filter(_.rateSpread == "NA"), counts)
-      manufacturedP2 <- purposes(manufactured.filter(pricingDataReported), counts)
-      manufacturedH1 <- purposes(manufactured.filter(_.hoepaStatus == 1), counts)
-      manufacturedH2 <- purposes(manufactured.filter(_.hoepaStatus == 2), counts)
-      manufacturedM1 <- purposes(manufactured, rateSpreadMean)
-      manufacturedM2 <- purposes(manufactured, rateSpreadMedian)
-
-      year <- yearF
+      manufacturedP1 <- purposes(manufactured.filter(_.rateSpread === "NA"), countToString)
+      manufacturedP2 <- purposes(manufactured.filter(_.rateSpread =!= "NA"), countToString)
+      manufacturedH1 <- purposes(manufactured.filter(_.hoepaStatus === 1), countToString)
+      manufacturedH2 <- purposes(manufactured.filter(_.hoepaStatus === 2), countToString)
+      manufacturedM1 <- purposes(manufactured.filter(_.rateSpread =!= "NA"), meanToString)
+      manufacturedM2 <- purposes(manufactured.filter(_.rateSpread =!= "NA"), medianToString)
     } yield {
       val report = s"""
        |{
        |    "table": "${metaData.reportTable}",
        |    "type": "${metaData.reportType}",
        |    "description": "${metaData.description}",
-       |    "year": "$year",
+       |    "year": "2017",
        |    "reportDate": "$reportDate",
-       |    $msa
        |    "singleFamily": [
        |        {
        |            "characteristic": "Incidence of Pricing",
@@ -155,19 +146,19 @@ trait AggregateBX extends AggregateReport {
     }
   }
 
-  private def purposes[ec: EC, mat: MAT, as: AS](lars: Source[LoanApplicationRegister, NotUsed], collector: Source[LoanApplicationRegister, NotUsed] => Future[String]): Future[String] = {
+  private def purposes[ec: EC](lars: Query[LARTable, LARTable#TableElementType, Seq], f: Query[LARTable, LARTable#TableElementType, Seq] => Future[String]): Future[String] = {
     for {
-      purchase <- lienDisposition("Home Purchase", lars.filter(lar => lar.loan.purpose == 1), collector)
-      refinance <- lienDisposition("Refinance", lars.filter(lar => lar.loan.purpose == 3), collector)
-      improvement <- lienDisposition("Home Improvement", lars.filter(lar => lar.loan.purpose == 2), collector)
+      purchase <- lienDisposition("Home Purchase", lars.filter(lar => lar.loanPurpose === 1), f)
+      refinance <- lienDisposition("Refinance", lars.filter(lar => lar.loanPurpose === 3), f)
+      improvement <- lienDisposition("Home Improvement", lars.filter(lar => lar.loanPurpose === 2), f)
     } yield List(purchase, refinance, improvement).mkString("[", ",", "]")
   }
 
-  private def lienDisposition[ec: EC, mat: MAT, as: AS](title: String, source: Source[LoanApplicationRegister, NotUsed], collector: Source[LoanApplicationRegister, NotUsed] => Future[String]): Future[String] = {
+  private def lienDisposition[ec: EC](title: String, source: Query[LARTable, LARTable#TableElementType, Seq], f: Query[LARTable, LARTable#TableElementType, Seq] => Future[String]): Future[String] = {
     for {
-      firstLien <- collector(source.filter(lar => lar.lienStatus == 1))
-      juniorLien <- collector(source.filter(lar => lar.lienStatus == 2))
-      noLien <- collector(source.filter(lar => lar.lienStatus != 1 && lar.lienStatus != 2))
+      firstLien <- f(source.filter(lar => lar.lienStatus === 1))
+      juniorLien <- f(source.filter(lar => lar.lienStatus === 2))
+      noLien <- f(source.filter(lar => lar.lienStatus =!= 1 && lar.lienStatus =!= 2))
     } yield {
       s"""
          |{
@@ -180,31 +171,16 @@ trait AggregateBX extends AggregateReport {
     }
   }
 
-  private def counts[ec: EC, mat: MAT, as: AS](source: Source[LoanApplicationRegister, NotUsed]): Future[String] = count(source).map(_.toString)
-
-  private def rateSpreadMedian[ec: EC, mat: MAT, as: AS](lars: Source[LoanApplicationRegister, NotUsed]): Future[String] = {
-    val rateSpreadsF: Future[Seq[Double]] =
-      lars.filter(pricingDataReported)
-        .map(lar => lar.rateSpread.toDouble)
-        .runWith(Sink.seq)
-
-    rateSpreadsF.map(seq => if (seq.isEmpty) "\"\"" else calculateMedian(seq).toString)
+  private def countToString[ec: EC](source: Query[LARTable, LARTable#TableElementType, Seq]): Future[String] = {
+    count(source).map(_.toString)
   }
 
-  private def rateSpreadMean[ec: EC, mat: MAT, as: AS](lars: Source[LoanApplicationRegister, NotUsed]): Future[String] = {
-    val loansFiltered = lars.filter(pricingDataReported)
-    val loanCountF = count(loansFiltered)
-    val rateSpreadSumF = sumDouble(loansFiltered, rateSpread)
-    for {
-      count <- loanCountF
-      totalRateSpread <- rateSpreadSumF
-    } yield {
-      if (count == 0) "\"\""
-      else {
-        val v = totalRateSpread / count
-        BigDecimal(v).setScale(2, BigDecimal.RoundingMode.HALF_UP).toDouble.toString
-      }
-    }
+  private def medianToString[ec: EC](source: Query[LARTable, LARTable#TableElementType, Seq]): Future[String] = {
+    calculateMedian(source.filter(_.rateSpread.asColumnOf[Double] >= 1.5)).map(_.toString)
+  }
+
+  private def meanToString[ec: EC](source: Query[LARTable, LARTable#TableElementType, Seq]): Future[String] = {
+    calculateMean(source.filter(_.rateSpread.asColumnOf[Double] >= 1.5)).map(_.toString)
   }
 
 }
