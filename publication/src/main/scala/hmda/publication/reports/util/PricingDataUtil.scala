@@ -23,6 +23,7 @@ object PricingDataUtil extends SourceUtils {
       rs5 <- pricingDisposition(lars, rateSpreadBetween(5, Int.MaxValue), "5 or more")
       mean <- reportedMean(lars)
       median <- reportedMedian(lars)
+      hoepa <- pricingDisposition(lars.filter(_.hoepaStatus == 1), (lar: LoanApplicationRegister) => true, "HOEPA Loans")
     } yield {
       s"""
          |[
@@ -35,7 +36,8 @@ object PricingDataUtil extends SourceUtils {
          |    $rs4,
          |    $rs5,
          |    $mean,
-         |    $median
+         |    $median,
+         |    $hoepa
          |]
      """.stripMargin
     }
@@ -73,33 +75,37 @@ object PricingDataUtil extends SourceUtils {
   def loanAmount(lar: LoanApplicationRegister): Int = lar.loan.amount
   def rateSpread(lar: LoanApplicationRegister): Double =
     Try(lar.rateSpread.toDouble).getOrElse(0)
+  def combined(lar: LoanApplicationRegister): (Int, Double) = (loanAmount(lar), rateSpread(lar))
 
   private def reportedMean[ec: EC, mat: MAT, as: AS](lars: Source[LoanApplicationRegister, NotUsed]): Future[String] = {
-    val loansFiltered = lars.filter(pricingDataReported)
+    val loansFiltered = lars.filter(rateSpreadBetween(1.5, Int.MaxValue))
 
-    calculateMean(loansFiltered, rateSpread).map { mean =>
-      val displayMean = if (mean == 0) "\"\"" else mean
+    for {
+      count <- sum(loansFiltered, loanAmount)
+      meanCount <- calculateMean(loansFiltered, rateSpread)
+      weighted <- weightedSum(loansFiltered, loanAmount, count, rateSpread)
+    } yield {
+      val roundWeighted = BigDecimal(weighted * 100).setScale(2, BigDecimal.RoundingMode.HALF_UP).toDouble
       s"""
          |{
          |    "pricing": "Mean",
-         |    "count": $displayMean,
-         |    "value": "None"
+         |    "count": $meanCount,
+         |    "value": $roundWeighted
          |}
        """.stripMargin
     }
   }
 
   private def reportedMedian[ec: EC, mat: MAT, as: AS](lars: Source[LoanApplicationRegister, NotUsed]): Future[String] = {
-    val median = calculateMedian(lars.filter(pricingDataReported), rateSpread)
+    val medianCount = calculateMedian(lars.filter(rateSpreadBetween(1.5, Int.MaxValue)), rateSpread)
+    val medianValue = calculateWeightedMedian(lars.filter(rateSpreadBetween(1.5, Int.MaxValue)), combined)
 
-    median.map { value =>
-      val displayMedian = if (value == 0) "\"\"" else value
-
+    Future.sequence(List(medianCount, medianValue)).map { results =>
       s"""
          |{
          |    "pricing": "Median",
-         |    "count": $displayMedian,
-         |    "value": "None"
+         |    "count": ${results.head},
+         |    "value": ${results(1)}
          |}
        """.stripMargin
     }
