@@ -83,7 +83,7 @@ class AggregateReportPublisher extends HmdaActor with ResourceUtils {
   )
 
   val reportMap: Map[Int, List[AggregateReport]] = Map(
-    35614 -> List(A1)
+    35614 -> List(A9)
   )
 
   // 46
@@ -138,8 +138,9 @@ class AggregateReportPublisher extends HmdaActor with ResourceUtils {
   val s3Flow =
     Flow[AggregateReportPayload]
       .map(payload => {
-        val filePath = s"prod/reports/aggregate/2017/${payload.msa}/${payload.reportID}.txt"
-        log.info(s"Publishing Aggregate report. MSA: ${payload.msa}, Report #: ${payload.reportID}")
+        val fileName = if (payload.reportID == "A9") "9" else payload.reportID
+        val filePath = s"prod/reports/aggregate/2017/${payload.msa}/$fileName.txt"
+        log.info(s"Publishing Aggregate report. MSA: ${payload.msa}, Report #: $fileName")
 
         Source.single(ByteString(payload.report))
           .runWith(s3Client.multipartUpload(bucket, filePath))
@@ -151,10 +152,21 @@ class AggregateReportPublisher extends HmdaActor with ResourceUtils {
     //val shortenedList = msaList.drop(start).filterNot(_ == -1).filterNot(completedMsas.contains(_))
     val shortenedList = msaList.drop(start).filterNot(_ == -1)
 
+    var startTime = System.currentTimeMillis()
+    var l = List[Long]()
     shortenedList.foreach(msa => {
       log.info(s"Index is ${msaList.indexOf(msa)}")
+
       val reports = generateMSAReports2(msa)
       Await.result(reports, 24.hours)
+
+      val timeDif = System.currentTimeMillis() - startTime
+      println(s"Report for $msa took ${timeDif / 60000} minutes")
+      l = l :+ timeDif
+      val average = l.sum / l.length
+      val numLeft = shortenedList.length - shortenedList.indexOf(msa) - 1
+      println(s"Average time for reports is ${average / 1000} seconds.  Time left is ${numLeft * average / 60000} minutes")
+      startTime = System.currentTimeMillis()
     })
   }
 
@@ -202,7 +214,7 @@ class AggregateReportPublisher extends HmdaActor with ResourceUtils {
     log.info(s"\n\nDOWNLOADED! $msa.txt     \nNumber of LARs is ${larSeq.length}\n")
     val larSource: Source[LoanApplicationRegister, NotUsed] = Source.fromIterator(() => larSeq.toIterator)
     val reportFlow = simpleReportFlow2(larSource)
-    val combinations = combine(List(msa), aggregateReports)
+    val combinations = combine(List(msa), List(A9))
 
     Source(combinations).via(reportFlow).via(s3Flow).runWith(Sink.lastOption)
   }

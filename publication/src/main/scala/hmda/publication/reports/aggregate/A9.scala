@@ -1,6 +1,6 @@
 package hmda.publication.reports.aggregate
 import akka.NotUsed
-import akka.stream.scaladsl.Source
+import akka.stream.scaladsl.{ Sink, Source }
 import hmda.census.model.{ Tract, TractLookup }
 import hmda.model.fi.lar.LoanApplicationRegister
 import hmda.model.publication.reports.ValueDisposition
@@ -9,6 +9,7 @@ import hmda.publication.reports.util.DispositionType._
 import hmda.publication.reports.util.ReportsMetaDataLookup
 import hmda.publication.reports.util.ReportUtil.{ calculateYear, formattedCurrentDate, msaReport }
 import hmda.publication.reports.{ AS, EC, MAT }
+import hmda.util.SourceUtils
 
 import scala.concurrent.Future
 
@@ -18,7 +19,7 @@ object A9 extends Aggregate9 {
   def msaString(fips: Int): String = s""""msa": ${msaReport(fips.toString).toJsonFormat},"""
   def msaTracts(fips: Int): Set[Tract] = TractLookup.values.filter(_.msa == fips.toString)
   def msaLars(larSource: Source[LoanApplicationRegister, NotUsed], fips: Int): Source[LoanApplicationRegister, NotUsed] =
-    larSource.filter(_.geography.msa == fips)
+    larSource.filter(_.geography.msa == fips.toString)
 }
 object N9 extends Aggregate9 {
   val reportId: String = "N9"
@@ -29,7 +30,7 @@ object N9 extends Aggregate9 {
     larSource.filter(_.geography.msa != "NA")
 }
 
-trait Aggregate9 extends AggregateReport {
+trait Aggregate9 extends AggregateReport with SourceUtils {
   val reportId: String
   def fipsString(fips: Int): String
   def msaString(fips: Int): String
