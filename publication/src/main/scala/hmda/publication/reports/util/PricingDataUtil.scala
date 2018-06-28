@@ -77,7 +77,7 @@ object PricingDataUtil extends SourceUtils {
     Try(lar.rateSpread.toDouble).getOrElse(0)
   def combined(lar: LoanApplicationRegister): (Int, Double) = (loanAmount(lar), rateSpread(lar))
 
-  private def reportedMean[ec: EC, mat: MAT, as: AS](lars: Source[LoanApplicationRegister, NotUsed]): Future[String] = {
+  def reportedMean[ec: EC, mat: MAT, as: AS](lars: Source[LoanApplicationRegister, NotUsed]): Future[String] = {
     val loansFiltered = lars.filter(rateSpreadBetween(1.5, Int.MaxValue))
 
     for {
@@ -96,7 +96,7 @@ object PricingDataUtil extends SourceUtils {
     }
   }
 
-  private def reportedMedian[ec: EC, mat: MAT, as: AS](lars: Source[LoanApplicationRegister, NotUsed]): Future[String] = {
+  def reportedMedian[ec: EC, mat: MAT, as: AS](lars: Source[LoanApplicationRegister, NotUsed]): Future[String] = {
     val medianCount = calculateMedian(lars.filter(rateSpreadBetween(1.5, Int.MaxValue)), rateSpread)
     val medianValue = calculateWeightedMedian(lars.filter(rateSpreadBetween(1.5, Int.MaxValue)), combined)
 

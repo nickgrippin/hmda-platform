@@ -207,15 +207,16 @@ class AggregateReportPublisher extends HmdaActor with ResourceUtils {
       larSeq <- larSeqF
       s <- getLarSeqFlow(larSeq, msa)
       t <- s.getOrElse(Future.apply(MultipartUploadResult(Uri.EMPTY, "", "", "")))
-    } yield t
+    } yield s
   }
 
   private def getLarSeqFlow(larSeq: Seq[LoanApplicationRegister], msa: Int) = {
     log.info(s"\n\nDOWNLOADED! $msa.txt     \nNumber of LARs is ${larSeq.length}\n")
     val larSource: Source[LoanApplicationRegister, NotUsed] = Source.fromIterator(() => larSeq.toIterator)
     val reportFlow = simpleReportFlow2(larSource)
-    val combinations = combine(List(msa), List(A9))
+    val combinations = combine(List(msa), List(AggregateB))
 
+    //Source(combinations).via(reportFlow).runWith(Sink.lastOption)
     Source(combinations).via(reportFlow).via(s3Flow).runWith(Sink.lastOption)
   }
 }

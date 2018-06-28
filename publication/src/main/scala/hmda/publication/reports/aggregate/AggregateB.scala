@@ -5,7 +5,7 @@ import akka.stream.scaladsl.{ Sink, Source }
 import hmda.model.fi.lar.LoanApplicationRegister
 import hmda.model.publication.reports.ReportTypeEnum.Aggregate
 import hmda.publication.reports._
-import hmda.publication.reports.util.PricingDataUtil.{ calculateMedian, pricingDataReported, rateSpread }
+import hmda.publication.reports.util.PricingDataUtil.{ calculateMedian, pricingDataReported, rateSpread, rateSpreadBetween }
 import hmda.publication.reports.util.ReportUtil._
 import hmda.publication.reports.util.ReportsMetaDataLookup
 
@@ -184,22 +184,22 @@ trait AggregateBX extends AggregateReport {
 
   private def rateSpreadMedian[ec: EC, mat: MAT, as: AS](lars: Source[LoanApplicationRegister, NotUsed]): Future[String] = {
     val rateSpreadsF: Future[Seq[Double]] =
-      lars.filter(pricingDataReported)
+      lars.filter(rateSpreadBetween(1.5, Int.MaxValue))
         .map(lar => lar.rateSpread.toDouble)
         .runWith(Sink.seq)
 
-    rateSpreadsF.map(seq => if (seq.isEmpty) "\"\"" else calculateMedian(seq).toString)
+    rateSpreadsF.map(seq => if (seq.isEmpty) "0" else calculateMedian(seq).toString)
   }
 
   private def rateSpreadMean[ec: EC, mat: MAT, as: AS](lars: Source[LoanApplicationRegister, NotUsed]): Future[String] = {
-    val loansFiltered = lars.filter(pricingDataReported)
+    val loansFiltered = lars.filter(rateSpreadBetween(1.5, Int.MaxValue))
     val loanCountF = count(loansFiltered)
     val rateSpreadSumF = sumDouble(loansFiltered, rateSpread)
     for {
       count <- loanCountF
       totalRateSpread <- rateSpreadSumF
     } yield {
-      if (count == 0) "\"\""
+      if (count == 0) "0"
       else {
         val v = totalRateSpread / count
         BigDecimal(v).setScale(2, BigDecimal.RoundingMode.HALF_UP).toDouble.toString
