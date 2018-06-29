@@ -3,11 +3,12 @@ import subprocess
 import re
 
 def main():
-    totalInsts = len(instList)
+    totalInsts = len(instList) + start
     #print("{} msas to check...".format(totalMSAs))
 
     for i, inst in enumerate(instList):
-        print("****** Institution: {} ({} of {}) ****".format(inst, i, totalInsts))
+        index = start + i
+        print("****** Institution: {} ({} of {}) ****".format(inst, index, totalInsts))
         instUri = s3BaseUrl + inst + "/"
         msaList = lsList(instUri)
 
@@ -45,9 +46,10 @@ def lsList(uri):
 
 
 
+start = 655
 s3BaseUrl = "s3://cfpb-hmda-public/prod/reports/disclosure/2017/"
 instListWhole = lsList(s3BaseUrl)
-instList = instListWhole[322:]
+instList = instListWhole[start:]
 
 main()
 
