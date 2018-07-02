@@ -23,8 +23,16 @@ import hmda.publication.reports.util.ReportsMetaDataLookup
 
 import scala.concurrent.Future
 
-object A4W extends DisclosureReport {
-  val reportId: String = "DA4W"
+object A4 extends A4 {
+  val reportId = "DA4"
+}
+
+object A4W extends A4 {
+  val reportId = "DA4W"
+}
+
+trait A4 extends DisclosureReport {
+  val reportId: String
   def filters(lar: LoanApplicationRegister): Boolean = {
     val loan = lar.loan
     loan.loanType == 1 && loan.purpose == 1 && lar.lienStatus == 1 &&
@@ -42,18 +50,28 @@ object A4W extends DisclosureReport {
 
     val metaData = ReportsMetaDataLookup.values(reportId)
 
-    val lars = larSource
-      .filter(filters)
+    val lars = if(reportId == "DA4") {
+      larSource
+          .filter(lar => lar.geography.msa != "NA" && lar.geography.msa.toInt == fipsCode)
+          .filter(filters)
+    } else {
+      larSource.filter(filters)
+    }
 
-    val incomeIntervals = larsByIncomeInterval(
-      lars.filter(lar => lar.applicant.income != "NA"),
-      calculateMedianIncomeIntervals(fipsCode)
-    )
-    val msa = msaReport(fipsCode.toString).toJsonFormat
+    val incomeIntervals = if(reportId == "DA4") {
+      larsByIncomeInterval(
+        lars.filter(lar => lar.applicant.income != "NA"),
+        calculateMedianIncomeIntervals(fipsCode)
+      )
+    } else {
+      nationalLarsByIncomeInterval(lars.filter(lar => lar.applicant.income != "NA"))
+    }
+    val msa = if(reportId == "DA4") "\"msa\": "+ msaReport(fipsCode.toString).toJsonFormat + "," else ""
+
     val reportDate = formattedCurrentDate
     val yearF = calculateYear(lars)
 
-    val msaTracts: Set[Tract] = TractLookup.values.filter(_.msa == fipsCode.toString)
+    val msaTracts: Set[Tract] = if(reportId == "DA4") TractLookup.values.filter(_.msa == fipsCode.toString) else TractLookup.values
 
     for {
       year <- yearF
@@ -108,7 +126,7 @@ object A4W extends DisclosureReport {
        |    "description": "${metaData.description}",
        |    "year": "$year",
        |    "reportDate": "$reportDate",
-       |    "msa": $msa,
+       |    $msa
        |    "borrowerCharacteristics": [
        |        {
        |            "characteristic": "Race",

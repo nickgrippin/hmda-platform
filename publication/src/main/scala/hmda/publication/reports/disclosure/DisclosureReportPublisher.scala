@@ -85,11 +85,11 @@ class DisclosureReportPublisher extends HmdaActor with LoanApplicationRegisterCa
     //D11_1, D11_2, D11_3, D11_4, D11_5, D11_6, D11_7, D11_8, D11_9, D11_10,
     D12_2,
     A1, A2, A3,
-    A4W,
+    A4,
     DiscB
   )
 
-  val nationwideReports = List(A1W, A2W, A3W, DiscBW, DIRS)
+  val nationwideReports = List(A1W, A2W, A3W, A4W, DiscBW, DIRS)
 
   override def receive: Receive = {
 
