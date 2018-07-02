@@ -92,10 +92,35 @@ trait PublicationAdminHttpApi extends HmdaCustomDirectives with ApiErrorProtocol
       }
     }
 
+  def reportsListPath(publicationSupervisor: ActorRef) =
+    path("disclosure" / Segment ) { (instId) =>
+      extractExecutionContext { executor =>
+        entity(as[List[String]]) { reports =>
+          implicit val ec = executor
+          timedPost { uri =>
+
+            val message = for {
+              p <- ( publicationSupervisor ? FindDisclosurePublisher() ).mapTo[ ActorRef ]
+            } yield {
+              p ! GenerateSeriesOfReports(instId, reports)
+            }
+
+            onComplete(message) {
+              case Success(sub) => complete(ToResponseMarshallable(StatusCodes.OK))
+              case Failure(error) =>
+                completeWithInternalError(uri, error)
+            }
+          }
+        }
+      }
+    }
+
   def publicationRoutes(supervisor: ActorRef, publicationSupervisor: ActorRef) =
     disclosureInstitutionsPath(publicationSupervisor) ~
       disclosureInstitutionMsaPath(publicationSupervisor) ~
-      individualReportPath(publicationSupervisor)
+      individualReportPath(publicationSupervisor) ~
+      reportsListPath(publicationSupervisor)
+
 
   /*
 def aggregateGenerationPath(supervisor: ActorRef, publicationSupervisor: ActorRef) =

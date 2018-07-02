@@ -82,12 +82,14 @@ class DisclosureReportPublisher extends HmdaActor with LoanApplicationRegisterCa
     D51, D52, D53, D54, D56, D57,
     D71, D72, D73, D74, D75, D76, D77,
     D81, D82, D83, D84, D85, D86, D87,
-    //D11_1, D11_2, D11_3, D11_4, D11_5, D11_6, D11_7, D11_8, D11_9, D11_10,
+    D11_1, D11_2, D11_3, D11_4, D11_5, D11_6, D11_7, D11_8, D11_9, D11_10,
     D12_2,
     A1, A2, A3,
     A4,
     DiscB
   )
+
+  val reportMap = reports.map(r => (r.reportId, r)).toMap
 
   val nationwideReports = List(A1W, A2W, A3W, A4W, DiscBW, DIRS)
 
@@ -109,6 +111,10 @@ class DisclosureReportPublisher extends HmdaActor with LoanApplicationRegisterCa
 
     case PublishIndividualReport(institutionId, msa, report) =>
       publishIndividualReport(institutionId, msa, reportsByName(report))
+
+    case GenerateSeriesOfReports(institutionId, reportList) =>
+      val l = reportList.flatMap(s => reportMap.get(s))
+      Await.result(allReportsForInstitution(institutionId, -1, l).map(s => Thread.sleep(2000)), 5.days)
 
     case _ => //do nothing
   }
@@ -132,7 +138,7 @@ class DisclosureReportPublisher extends HmdaActor with LoanApplicationRegisterCa
     }
   }
 
-  private def allReportsForInstitution(institutionId: String, msa: Int = -1): Future[Unit] = {
+  private def allReportsForInstitution(institutionId: String, msa: Int = -1, reportsList: List[DisclosureReport] = List()): Future[Unit] = {
     val larSeqF: Future[Seq[LoanApplicationRegister]] = s3Source(institutionId).runWith(Sink.seq)
     for {
       institution <- getInstitution(institutionId)
@@ -147,14 +153,15 @@ class DisclosureReportPublisher extends HmdaActor with LoanApplicationRegisterCa
       println(stringMsa)
 
       val larSource: Source[LoanApplicationRegister, NotUsed] = Source.fromIterator(() => larSeq.toIterator)
-      if (msa == -1 && msas.indexOf(msa) != -1) {
+      if (msa == -1 && msas.indexOf(msa) != -1 && reports.isEmpty) {
         println(s"starting nationwide reports for $institutionId, beginning with msa ${msaSection.head}")
         Await.result(generateAndPublish(List(-1), nationwideReports, larSource, institution, msas.toList), 10.hours)
       }
 
       msaSection.foreach { msa: Int =>
         println(s"starting reports for $institutionId, msa $msa")
-        Await.result(generateAndPublish(List(msa), reports, larSource, institution, msas.toList).map(s => Thread.sleep(1500)), 24.hours)
+        val r = if(reportsList.isEmpty) reports else reportsList
+        Await.result(generateAndPublish(List(msa), r, larSource, institution, msas.toList).map(s => Thread.sleep(1500)), 24.hours)
       }
 
     }
