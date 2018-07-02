@@ -46,7 +46,7 @@ def lsList(uri):
 
 
 
-start = 655
+start = 3331
 s3BaseUrl = "s3://cfpb-hmda-public/prod/reports/disclosure/2017/"
 instListWhole = lsList(s3BaseUrl)
 instList = instListWhole[start:]
