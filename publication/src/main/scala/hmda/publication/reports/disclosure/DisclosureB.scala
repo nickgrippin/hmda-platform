@@ -198,7 +198,7 @@ trait DisclosureB extends DisclosureReport {
         .map(lar => lar.rateSpread.toDouble)
         .runWith(Sink.seq)
 
-    rateSpreadsF.map(seq => if (seq.isEmpty) "\"\"" else calculateMedian(seq).toString)
+    rateSpreadsF.map(seq => if (seq.isEmpty) "0" else calculateMedian(seq).toString)
   }
 
   private def rateSpreadMean[ec: EC, mat: MAT, as: AS](lars: Source[LoanApplicationRegister, NotUsed]): Future[String] = {
@@ -209,7 +209,7 @@ trait DisclosureB extends DisclosureReport {
       count <- loanCountF
       totalRateSpread <- rateSpreadSumF
     } yield {
-      if (count == 0) "\"\""
+      if (count == 0) "0"
       else {
         val v = totalRateSpread / count
         BigDecimal(v).setScale(2, BigDecimal.RoundingMode.HALF_UP).toDouble.toString
