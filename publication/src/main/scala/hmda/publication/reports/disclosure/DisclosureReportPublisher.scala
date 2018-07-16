@@ -76,22 +76,22 @@ class DisclosureReportPublisher extends HmdaActor with LoanApplicationRegisterCa
   val s3Client = new S3Client(awsSettings)
 
   val reports = List(
-    D1, D2,
-    D31, D32,
-    D41, D42, D43, D44, D45, D46, D47,
-    D51, D52, D53, D54, D56, D57,
-    D71, D72, D73, D74, D75, D76, D77,
-    D81, D82, D83, D84, D85, D86, D87,
+    //D1, D2,
+    //D31, D32,
+    //D41, D42, D43, D44, D45, D46, D47,
+    //D51, D52, D53, D54, D56, D57,
+    //D71, D72, D73, D74, D75, D76, D77,
+    //D81, D82, D83, D84, D85, D86, D87,
     D11_1, D11_2, D11_3, D11_4, D11_5, D11_6, D11_7, D11_8, D11_9, D11_10,
-    D12_2,
-    A1, A2, A3,
-    A4,
-    DiscB
+    D12_2
+    //A1, A2, A3,
+    //A4,
+    //DiscB
   )
 
   val reportMap = reports.map(r => (r.reportId, r)).toMap
 
-  val nationwideReports = List(A1W, A2W, A3W, A4W, DiscBW, DIRS)
+  val nationwideReports = List(/*A1W, A2W, A3W,*/ A4W/*, DiscBW, DIRS*/)
 
   override def receive: Receive = {
 
