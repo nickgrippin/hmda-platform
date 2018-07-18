@@ -153,7 +153,7 @@ class DisclosureReportPublisher extends HmdaActor with LoanApplicationRegisterCa
       println(stringMsa)
 
       val larSource: Source[LoanApplicationRegister, NotUsed] = Source.fromIterator(() => larSeq.toIterator)
-      if (msa == -1 && msas.indexOf(msa) != -1 && reports.isEmpty) {
+      if (msa == -1 && reportsList.isEmpty) {
         println(s"starting nationwide reports for $institutionId, beginning with msa ${msaSection.head}")
         Await.result(generateAndPublish(List(-1), nationwideReports, larSource, institution, msas.toList), 10.hours)
       }
