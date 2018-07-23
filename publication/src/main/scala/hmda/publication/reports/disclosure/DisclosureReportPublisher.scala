@@ -146,23 +146,23 @@ class DisclosureReportPublisher extends HmdaActor with LoanApplicationRegisterCa
       msas <- getMSAFromIRS(subId)
       larSeq <- larSeqF
     } yield {
-      val msaSection = msas.slice(msas.indexOf(msa), msas.length)
+      /*val msaSection = msas.slice(msas.indexOf(msa), msas.length)
       val stringMsa = if (msas.indexOf(msa) == -1 && msa != -1)
         s"\n\nMSA $msa was NOT FOUND\nRunning full list\nmsaList: $msas, submission: $subId\n"
       else s"msaList: $msaSection, submission: $subId\n"
-      println(stringMsa)
+      println(stringMsa)*/
 
       val larSource: Source[LoanApplicationRegister, NotUsed] = Source.fromIterator(() => larSeq.toIterator)
-      if (msa == -1 && reportsList.isEmpty) {
-        println(s"starting nationwide reports for $institutionId, beginning with msa ${msaSection.head}")
+      /*if (msa == -1 && reportsList.isEmpty) {*/
+        println(s"starting nationwide reports for $institutionId")
         Await.result(generateAndPublish(List(-1), nationwideReports, larSource, institution, msas.toList), 10.hours)
-      }
+      /*}
 
       msaSection.foreach { msa: Int =>
         println(s"starting reports for $institutionId, msa $msa")
         val r = if(reportsList.isEmpty) reports else reportsList
         Await.result(generateAndPublish(List(msa), r, larSource, institution, msas.toList).map(s => Thread.sleep(1500)), 24.hours)
-      }
+      }*/
 
     }
   }
