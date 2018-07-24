@@ -55,7 +55,7 @@ trait A4 extends DisclosureReport {
           .filter(lar => lar.geography.msa != "NA" && lar.geography.msa.toInt == fipsCode)
           .filter(filters)
     } else {
-      larSource.filter(filters)
+      larSource.filter(filters).filter(lar => lar.geography.msa != "NA")
     }
 
     val incomeIntervals = if(reportId == "DA4") {
