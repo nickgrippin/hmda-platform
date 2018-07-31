@@ -26,7 +26,7 @@ object RegulatorTsPublisher {
 
 class RegulatorTsPublisher extends HmdaActor with TransmittalSheetCassandraRepository {
 
-  QuartzSchedulerExtension(system).schedule("TSRegulator", self, PublishRegulatorData)
+  //QuartzSchedulerExtension(system).schedule("TSRegulator", self, PublishRegulatorData)
 
   val decider: Decider = { e =>
     log.error("Unhandled error in stream", e)

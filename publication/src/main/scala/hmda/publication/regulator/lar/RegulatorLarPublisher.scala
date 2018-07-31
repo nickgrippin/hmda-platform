@@ -29,7 +29,7 @@ object RegulatorLarPublisher {
 
 class RegulatorLarPublisher extends HmdaActor with LoanApplicationRegisterCassandraRepository {
 
-  QuartzSchedulerExtension(system).schedule("LARRegulator", self, PublishRegulatorData)
+  //QuartzSchedulerExtension(system).schedule("LARRegulator", self, PublishRegulatorData)
 
   val decider: Decider = { e =>
     log.error("Unhandled error in stream", e)

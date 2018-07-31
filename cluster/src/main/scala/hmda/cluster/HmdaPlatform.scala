@@ -131,7 +131,7 @@ object HmdaPlatform extends App {
     (supervisorProxy ? FindAPORPersistence(HmdaAPORPersistence.name))
       .mapTo[ActorRef]
       .map { a =>
-        QuartzSchedulerExtension(system).schedule("AporCalculator", a, LoadAporDataFromS3)
+        //QuartzSchedulerExtension(system).schedule("AporCalculator", a, LoadAporDataFromS3)
         log.info(s"Started Rate Spread calculator at ${a.path}")
       }
 
