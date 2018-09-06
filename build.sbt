@@ -82,6 +82,9 @@ lazy val `hmda-platform` = (project in file("hmda"))
                  sbtdocker.DockerPlugin,
                  AshScriptPlugin)
   .settings(hmdaBuildSettings: _*)
+  .settings(commands += Command.command("testUntilFailed") { state =>
+    "testOnly *LarFormatValid*" :: "testUntilFailed" :: state
+  })
   .settings(
     Seq(
       mainClass in Compile := Some("hmda.HmdaPlatform"),
