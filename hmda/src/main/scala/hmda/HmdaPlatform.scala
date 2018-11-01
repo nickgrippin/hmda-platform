@@ -68,7 +68,7 @@ object HmdaPlatform extends App {
   }
 
   if (runtimeMode == "dev") {
-    CassandraUtil.startEmbeddedCassandra()
+    //CassandraUtil.startEmbeddedCassandra()
     implicit val embeddedKafkaConfig: EmbeddedKafkaConfig = EmbeddedKafkaConfig(
       9092,
       2182,

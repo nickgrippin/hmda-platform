@@ -5,7 +5,7 @@
 namespace: default
 
 cassandra:
-  hosts: node-0-server.cassandra.autoip.dcos.thisdcos.directory
+  hosts: 10.153.98.30
 
 keycloak:
   auth.url: https://192.168.99.100:8443/auth
@@ -13,7 +13,7 @@ keycloak:
 rbac:
   enabled: false
 
-replicaCount: 3
+replicaCount: 1
 
 image:
   repository: hmda/hmda-platform
@@ -22,7 +22,7 @@ image:
 
 hmda:
   actorSystemName: hmda2
-  runtimeMode: kubernetes
+  runtimeMode: dev
 
 service:
   type: NodePort

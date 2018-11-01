@@ -28,7 +28,7 @@ object InstitutionPersistence
           commandHandler = commandHandler(ctx),
           eventHandler = eventHandler
         )
-        .snapshotEvery(1000)
+        .snapshotEvery(300)
         .withTagger(_ => Set(name.toLowerCase()))
     }
   }

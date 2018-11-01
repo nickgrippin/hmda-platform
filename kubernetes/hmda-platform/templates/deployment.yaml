@@ -5,7 +5,7 @@ metadata:
     app: {{ template "hmda-platform.name" . }}
   name: {{ template "hmda-platform.fullname" . }}
 spec:
-  replicas: 3
+  replicas: 1
   selector:
     matchLabels:
       app: {{ template "hmda-platform.name" . }}
