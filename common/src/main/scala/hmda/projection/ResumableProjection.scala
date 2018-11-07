@@ -47,10 +47,12 @@ trait ResumableProjection {
         implicit val scheduler: Scheduler = system.scheduler
         log.info("Streaming messages from {}", name)
         readJournal(system)
-          .eventsByTag("institution", state.offset)
+          .eventsByTag("institution", NoOffset)
           .map { env =>
-            log.info(env.toString)
-            projectEvent(env)
+            log.info(env.event.toString)
+            val p = projectEvent(env)
+            Thread.sleep(200)
+            p
           }
           .map { env =>
             val actorRef = ctx.asScala.self

@@ -33,6 +33,8 @@ object InstitutionDBProjection
 
   implicit val ec: ExecutionContext = ExecutionContext.global
 
+  var count = 0
+
   override def projectEvent(envelope: EventEnvelope): EventEnvelope = {
     val event = envelope.event
     event match {
@@ -51,6 +53,8 @@ object InstitutionDBProjection
         institutionRepository.deleteById(lei)
         deleteEmails(lei)
     }
+    count = count + 1
+    println(s"Count is $count")
     envelope
   }
 
