@@ -52,10 +52,11 @@ object InstitutionLoader extends App with FlowUtils {
     .drop(1)
     .map(line => line.utf8String)
     .map(x => InstitutionCsvParser(x))
-    .map(i => request(i.asJson.noSpaces))
+    .map(y => println(y.asJson.noSpaces))
+    /*.map(i => request(i.asJson.noSpaces))
     .mapAsync(parallelism) { req =>
       Http().singleRequest(req)
-    }
+    }*/
     .runWith(Sink.last)
     .onComplete(_ => system.terminate())
 
