@@ -39,7 +39,7 @@ object InstitutionDBProjection
     val event = envelope.event
     event match {
       case InstitutionCreated(i) =>
-        institutionRepository.insertOrUpdate(InstitutionConverter.convert(i))
+        //institutionRepository.insertOrUpdate(InstitutionConverter.convert(i))
         val emails = InstitutionConverter.emailsFromInstitution(i)
         emails.foreach(email => {
           Thread.sleep(100)

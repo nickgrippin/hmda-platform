@@ -15,7 +15,7 @@ import akka.persistence.typed.scaladsl.PersistentBehavior.CommandHandler
 import akka.stream.scaladsl.Sink
 import akka.util.Timeout
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
 trait ResumableProjection {
 
@@ -47,8 +47,9 @@ trait ResumableProjection {
         implicit val system: ActorSystem = ctx.asScala.system.toUntyped
         implicit val materializer: ActorMaterializer = ActorMaterializer()
         implicit val scheduler: Scheduler = system.scheduler
+        implicit val ec: ExecutionContext = ExecutionContext.global
         log.info("Streaming messages from {}", name)
-        readJournal(system)
+        val x = readJournal(system)
           .eventsByTag("institution", NoOffset)
           .map { env =>
             log.info(env.event.toString)
@@ -62,7 +63,8 @@ trait ResumableProjection {
               SaveOffset(env.offset, ref))
             result
           }
-          .runWith(Sink.ignore)
+          .runWith(Sink.last)
+        x.flatten.map(t => println("Stream is completed"))
         Effect.none
 
       case SaveOffset(offset, replyTo) =>

@@ -23,8 +23,8 @@ object InstitutionPersistence
     Behaviors.setup { ctx =>
       ctx.log.info(s"Started Institution: $entityId")
       PersistentBehavior[InstitutionCommand,
-        InstitutionEvent,
-        InstitutionState](
+                         InstitutionEvent,
+                         InstitutionState](
         persistenceId = PersistenceId(entityId),
         emptyState = InstitutionState(None),
         commandHandler = commandHandler(ctx),
