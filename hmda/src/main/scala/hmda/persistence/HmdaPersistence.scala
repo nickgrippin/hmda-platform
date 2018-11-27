@@ -6,7 +6,7 @@ import akka.cluster.sharding.typed.scaladsl.ClusterSharding
 import com.typesafe.config.ConfigFactory
 import hmda.persistence.filing.FilingPersistence
 import hmda.persistence.institution.InstitutionPersistence
-import hmda.persistence.submission.{SubmissionManager, SubmissionPersistence}
+import hmda.persistence.submission._
 
 object HmdaPersistence {
 
@@ -19,11 +19,14 @@ object HmdaPersistence {
   val behavior: Behavior[HmdaPersistenceCommand] =
     Behaviors.setup { ctx =>
       ctx.log.info(s"Actor started at ${ctx.self.path}")
-
-      InstitutionPersistence.startShardRegion(ClusterSharding(ctx.system))
-      FilingPersistence.startShardRegion(ClusterSharding(ctx.system))
-      SubmissionPersistence.startShardRegion(ClusterSharding(ctx.system))
-      SubmissionManager.startShardRegion(ClusterSharding(ctx.system))
+      val sharding = ClusterSharding(ctx.system)
+      InstitutionPersistence.startShardRegion(sharding)
+      FilingPersistence.startShardRegion(sharding)
+      SubmissionPersistence.startShardRegion(sharding)
+      SubmissionManager.startShardRegion(sharding)
+      HmdaParserError.startShardRegion(sharding)
+      HmdaValidationError.startShardRegion(sharding)
+      EditDetailsPersistence.startShardRegion(sharding)
 
       Behaviors
         .receive[HmdaPersistenceCommand] {

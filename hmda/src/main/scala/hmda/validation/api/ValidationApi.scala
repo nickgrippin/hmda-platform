@@ -1,7 +1,6 @@
 package hmda.validation.api
 
 import cats.Semigroup
-import cats.data._
 import hmda.model.validation._
 import hmda.validation.dsl.{
   ValidationFailure,
@@ -10,6 +9,7 @@ import hmda.validation.dsl.{
 }
 import hmda.validation.rules.EditCheck
 import cats.implicits._
+import hmda.validation.HmdaValidation
 
 trait ValidationApi[A] {
 
@@ -17,17 +17,18 @@ trait ValidationApi[A] {
     override def combine(x: A, y: A): A = x
   }
 
-  type HmdaValidation[B] = ValidatedNel[ValidationError, B]
-
-  def check[B](editCheck: EditCheck[B],
-               input: B,
-               errorId: String,
-               validationErrorType: ValidationErrorType): HmdaValidation[B] = {
+  def check[B](
+      editCheck: EditCheck[B],
+      input: B,
+      errorId: String,
+      validationErrorType: ValidationErrorType,
+      validationErrorEntity: ValidationErrorEntity): HmdaValidation[B] = {
     convertResult(input,
                   editCheck(input),
                   editCheck.name,
                   errorId,
-                  validationErrorType)
+                  validationErrorType,
+                  validationErrorEntity)
   }
 
   def convertResult[B](
@@ -35,7 +36,8 @@ trait ValidationApi[A] {
       result: ValidationResult,
       editName: String,
       uli: String,
-      validationErrorType: ValidationErrorType): HmdaValidation[B] =
+      validationErrorType: ValidationErrorType,
+      validationErrorEntity: ValidationErrorEntity): HmdaValidation[B] =
     result match {
 
       case ValidationSuccess => input.validNel
@@ -43,10 +45,12 @@ trait ValidationApi[A] {
       case ValidationFailure =>
         validationErrorType match {
           case Syntactical =>
-            SyntacticalValidationError(uli, editName).invalidNel
-          case Validity => ValidityValidationError(uli, editName).invalidNel
-          case Quality  => QualityValidationError(uli, editName).invalidNel
-          case Macro    => MacroValidationError(editName).invalidNel
+            SyntacticalValidationError(uli, editName, validationErrorEntity).invalidNel
+          case Validity =>
+            ValidityValidationError(uli, editName, validationErrorEntity).invalidNel
+          case Quality =>
+            QualityValidationError(uli, editName).invalidNel
+          case Macro => MacroValidationError(editName).invalidNel
         }
     }
 

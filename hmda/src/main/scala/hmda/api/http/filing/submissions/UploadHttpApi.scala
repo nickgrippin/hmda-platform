@@ -34,7 +34,10 @@ import hmda.api.http.directives.HmdaTimeDirectives
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
 import io.circe.generic.auto._
 import hmda.api.http.codec.filing.submission.SubmissionStatusCodec._
+import hmda.api.http.codec.ErrorResponseCodec._
+import hmda.util.http.FilingResponseUtils._
 import hmda.api.http.model.ErrorResponse
+import hmda.auth.OAuth2Authorization
 import hmda.messages.submission.SubmissionCommands.GetSubmission
 import hmda.model.filing.submission._
 import hmda.persistence.submission.{SubmissionManager, SubmissionPersistence}
@@ -60,72 +63,61 @@ trait UploadHttpApi extends HmdaTimeDirectives {
   val config: Config
 
   // institutions/<lei>/filings/<period>/submissions/<seqNr>
-  def uploadHmdaFileRoute: Route =
+  def uploadHmdaFileRoute(oAuth2Authorization: OAuth2Authorization) =
     path(Segment / "filings" / Segment / "submissions" / IntNumber) {
       (lei, period, seqNr) =>
-        timedPost { uri =>
-          val submissionId = SubmissionId(lei, period, seqNr)
-          val uploadTimestamp = Instant.now.toEpochMilli
+        oAuth2Authorization.authorizeTokenWithLei(lei) { _ =>
+          timedPost { uri =>
+            val submissionId = SubmissionId(lei, period, seqNr)
+            val uploadTimestamp = Instant.now.toEpochMilli
 
-          val submissionManager =
-            sharding.entityRefFor(
-              SubmissionManager.typeKey,
-              s"${SubmissionManager.name}-${submissionId.toString}")
+            val submissionManager =
+              sharding.entityRefFor(
+                SubmissionManager.typeKey,
+                s"${SubmissionManager.name}-${submissionId.toString}")
 
-          val submissionPersistence =
-            sharding.entityRefFor(
-              SubmissionPersistence.typeKey,
-              s"${SubmissionPersistence.name}-${submissionId.toString}")
+            val submissionPersistence =
+              sharding.entityRefFor(
+                SubmissionPersistence.typeKey,
+                s"${SubmissionPersistence.name}-${submissionId.toString}")
 
-          val fSubmission
-            : Future[Option[Submission]] = submissionPersistence ? (ref =>
-            GetSubmission(ref))
+            val fSubmission
+              : Future[Option[Submission]] = submissionPersistence ? (ref =>
+              GetSubmission(ref))
 
-          val fCheckSubmission = for {
-            s <- fSubmission.mapTo[Option[Submission]]
-          } yield s
+            val fCheckSubmission = for {
+              s <- fSubmission.mapTo[Option[Submission]]
+            } yield s
 
-          onComplete(fCheckSubmission) {
-            case Success(result) =>
-              result match {
-                case Some(submission) =>
-                  if (submission.status == Created) {
-                    uploadFile(submissionManager,
-                               uploadTopic,
-                               uploadTimestamp,
-                               submission,
-                               uri)
-                  } else {
+            onComplete(fCheckSubmission) {
+              case Success(result) =>
+                result match {
+                  case Some(submission) =>
+                    if (submission.status == Created) {
+                      uploadFile(submissionManager,
+                                 uploadTopic,
+                                 uploadTimestamp,
+                                 submission,
+                                 uri)
+                    } else {
+                      submissionNotAvailable(submissionId, uri)
+                    }
+                  case None =>
                     submissionNotAvailable(submissionId, uri)
-                  }
-                case None =>
-                  submissionNotAvailable(submissionId, uri)
-              }
-            case Failure(error) =>
-              val errorResponse =
-                ErrorResponse(500, error.getLocalizedMessage, uri.path)
-              complete(
-                ToResponseMarshallable(
-                  StatusCodes.InternalServerError -> errorResponse))
+                }
+              case Failure(error) =>
+                failedResponse(StatusCodes.InternalServerError, uri, error)
+            }
           }
         }
     }
 
-  private def submissionNotAvailable(submissionId: SubmissionId,
-                                     uri: Uri): Route = {
-    val errorResponse = ErrorResponse(
-      400,
-      s"Submission ${submissionId.toString} not available for upload",
-      uri.path)
-    complete(ToResponseMarshallable(StatusCodes.BadRequest -> errorResponse))
-  }
-
-  def uploadRoutes: Route = {
+  def uploadRoutes(oAuth2Authorization: OAuth2Authorization): Route = {
     handleRejections(corsRejectionHandler) {
       cors() {
         encodeResponse {
           pathPrefix("institutions") {
-            uploadHmdaFileRoute
+            uploadHmdaFileRoute(oAuth2Authorization)
           }
         }
       }
@@ -141,18 +133,21 @@ trait UploadHttpApi extends HmdaTimeDirectives {
       Framing.delimiter(ByteString("\n"), 2048, allowTruncation = true)
 
     fileUpload("file") {
-      case (_, byteSource) =>
+      case (metadata, byteSource)
+          if metadata.fileName.toLowerCase.endsWith(".txt") =>
         val modified = submission.copy(status = Uploading)
         submissionManager ! UpdateSubmissionStatus(modified)
         val fUploaded = byteSource
           .via(splitLines)
-          .map(_.utf8String)
+          .map(_.utf8String + "\n")
           .via(uploadProducer(topic, submission.id))
           .runWith(Sink.ignore)
 
         onComplete(fUploaded) {
           case Success(_) =>
-            val modified = submission.copy(status = Uploaded)
+            val fileName = metadata.fileName
+            val modified =
+              submission.copy(status = Uploaded, fileName = fileName)
             submissionManager ! UpdateSubmissionStatus(modified)
             complete(
               ToResponseMarshallable(

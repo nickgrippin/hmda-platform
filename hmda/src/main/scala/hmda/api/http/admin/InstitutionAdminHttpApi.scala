@@ -14,6 +14,7 @@ import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
 import hmda.api.http.directives.HmdaTimeDirectives
 import hmda.api.http.codec.institution.InstitutionCodec._
 import hmda.api.http.model.ErrorResponse
+import hmda.api.http.codec.ErrorResponseCodec._
 import hmda.api.http.model.admin.InstitutionDeletedResponse
 import hmda.persistence.institution.InstitutionPersistence
 import io.circe.generic.auto._
@@ -27,6 +28,7 @@ import hmda.messages.institution.InstitutionCommands.{
   ModifyInstitution
 }
 import hmda.messages.institution.InstitutionEvents._
+import hmda.util.http.FilingResponseUtils._
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
@@ -45,88 +47,76 @@ trait InstitutionAdminHttpApi extends HmdaTimeDirectives {
 
   def institutionWritePath(oAuth2Authorization: OAuth2Authorization) =
     oAuth2Authorization.authorizeTokenWithRole(hmdaAdminRole) { _ =>
-      entity(as[Institution]) { institution =>
-        val institutionPersistence = sharding.entityRefFor(
-          InstitutionPersistence.typeKey,
-          s"${InstitutionPersistence.name}-${institution.LEI}")
+      path("institutions") {
+        entity(as[Institution]) { institution =>
+          val institutionPersistence = sharding.entityRefFor(
+            InstitutionPersistence.typeKey,
+            s"${InstitutionPersistence.name}-${institution.LEI}")
 
-        timedPost { uri =>
-          val fCreated: Future[InstitutionCreated] = institutionPersistence ? (
-              ref => CreateInstitution(institution, ref))
-
-          onComplete(fCreated) {
-            case Success(InstitutionCreated(i)) =>
-              complete(ToResponseMarshallable(StatusCodes.Created -> i))
-            case Failure(error) =>
-              val errorResponse =
-                ErrorResponse(500, error.getLocalizedMessage, uri.path)
-              complete(ToResponseMarshallable(
-                StatusCodes.InternalServerError -> errorResponse))
-          }
-        } ~
-          timedPut { uri =>
-            val fModified: Future[InstitutionEvent] = institutionPersistence ? (
-                ref => ModifyInstitution(institution, ref)
+          timedPost { uri =>
+            val fInstitution
+              : Future[Option[Institution]] = institutionPersistence ? (
+                ref => GetInstitution(ref)
             )
-
-            onComplete(fModified) {
-              case Success(InstitutionModified(i)) =>
-                complete(ToResponseMarshallable(StatusCodes.Accepted -> i))
-              case Success(InstitutionNotExists(lei)) =>
-                complete(ToResponseMarshallable(StatusCodes.NotFound -> lei))
-              case Success(_) =>
-                complete(
-                  ToResponseMarshallable(HttpResponse(StatusCodes.BadRequest)))
+            onComplete(fInstitution) {
+              case Success(Some(_)) =>
+                entityAlreadyExists(
+                  StatusCodes.BadRequest,
+                  uri,
+                  s"Institution ${institution.LEI} already exists")
+              case Success(None) =>
+                val fCreated
+                  : Future[InstitutionCreated] = institutionPersistence ? (
+                    ref => CreateInstitution(institution, ref))
+                onComplete(fCreated) {
+                  case Success(InstitutionCreated(i)) =>
+                    complete(ToResponseMarshallable(StatusCodes.Created -> i))
+                  case Failure(error) =>
+                    failedResponse(StatusCodes.InternalServerError, uri, error)
+                }
               case Failure(error) =>
-                val errorResponse =
-                  ErrorResponse(500, error.getLocalizedMessage, uri.path)
-                complete(ToResponseMarshallable(
-                  StatusCodes.InternalServerError -> errorResponse))
+                failedResponse(StatusCodes.InternalServerError, uri, error)
             }
-          } ~
-          timedPut { uri =>
-            val fModified: Future[InstitutionEvent] = institutionPersistence ? (
-                ref => ModifyInstitution(institution, ref)
-            )
 
-            onComplete(fModified) {
-              case Success(InstitutionModified(i)) =>
-                complete(ToResponseMarshallable(StatusCodes.Accepted -> i))
-              case Success(InstitutionNotExists(lei)) =>
-                complete(ToResponseMarshallable(StatusCodes.NotFound -> lei))
-              case Success(_) =>
-                complete(
-                  ToResponseMarshallable(HttpResponse(StatusCodes.BadRequest)))
-              case Failure(error) =>
-                val errorResponse =
-                  ErrorResponse(500, error.getLocalizedMessage, uri.path)
-                complete(ToResponseMarshallable(
-                  StatusCodes.InternalServerError -> errorResponse))
-            }
           } ~
-          timedDelete { uri =>
-            val fDeleted: Future[InstitutionEvent] = institutionPersistence ? (
-                ref => DeleteInstitution(institution.LEI, ref)
-            )
+            timedPut { uri =>
+              val fModified
+                : Future[InstitutionEvent] = institutionPersistence ? (
+                  ref => ModifyInstitution(institution, ref)
+              )
 
-            onComplete(fDeleted) {
-              case Success(InstitutionDeleted(lei)) =>
-                complete(
-                  ToResponseMarshallable(
+              onComplete(fModified) {
+                case Success(InstitutionModified(i)) =>
+                  complete(ToResponseMarshallable(StatusCodes.Accepted -> i))
+                case Success(InstitutionNotExists(lei)) =>
+                  complete(ToResponseMarshallable(StatusCodes.NotFound -> lei))
+                case Success(_) =>
+                  complete(ToResponseMarshallable(
+                    HttpResponse(StatusCodes.BadRequest)))
+                case Failure(error) =>
+                  failedResponse(StatusCodes.InternalServerError, uri, error)
+              }
+            } ~
+            timedDelete { uri =>
+              val fDeleted
+                : Future[InstitutionEvent] = institutionPersistence ? (
+                  ref => DeleteInstitution(institution.LEI, ref)
+              )
+
+              onComplete(fDeleted) {
+                case Success(InstitutionDeleted(lei)) =>
+                  complete(ToResponseMarshallable(
                     StatusCodes.Accepted -> InstitutionDeletedResponse(lei)))
-              case Success(InstitutionNotExists(lei)) =>
-                complete(ToResponseMarshallable(StatusCodes.NotFound -> lei))
-              case Success(_) =>
-                complete(
-                  ToResponseMarshallable(HttpResponse(StatusCodes.BadRequest)))
-              case Failure(error) =>
-                val errorResponse =
-                  ErrorResponse(500, error.getLocalizedMessage, uri.path)
-                complete(
-                  ToResponseMarshallable(
-                    StatusCodes.InternalServerError -> errorResponse))
+                case Success(InstitutionNotExists(lei)) =>
+                  complete(ToResponseMarshallable(StatusCodes.NotFound -> lei))
+                case Success(_) =>
+                  complete(ToResponseMarshallable(
+                    HttpResponse(StatusCodes.BadRequest)))
+                case Failure(error) =>
+                  failedResponse(StatusCodes.InternalServerError, uri, error)
+              }
             }
-          }
+        }
       }
     }
 

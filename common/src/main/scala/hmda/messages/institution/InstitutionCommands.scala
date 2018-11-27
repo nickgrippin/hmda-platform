@@ -6,24 +6,33 @@ import hmda.messages.institution.InstitutionEvents.{
   InstitutionCreated,
   InstitutionEvent
 }
-import hmda.model.institution.Institution
+import hmda.model.filing.Filing
+import hmda.model.institution.{Institution, InstitutionDetail}
 
 object InstitutionCommands {
   sealed trait InstitutionCommand extends Command
 
-  case class CreateInstitution(i: Institution,
-                               replyTo: ActorRef[InstitutionCreated])
+  final case class CreateInstitution(i: Institution,
+                                     replyTo: ActorRef[InstitutionCreated])
       extends InstitutionCommand
 
-  case class ModifyInstitution(i: Institution,
-                               replyTo: ActorRef[InstitutionEvent])
+  final case class ModifyInstitution(i: Institution,
+                                     replyTo: ActorRef[InstitutionEvent])
       extends InstitutionCommand
 
-  case class DeleteInstitution(LEI: String, replyTo: ActorRef[InstitutionEvent])
+  final case class DeleteInstitution(LEI: String,
+                                     replyTo: ActorRef[InstitutionEvent])
       extends InstitutionCommand
 
-  case class GetInstitution(replyTo: ActorRef[Option[Institution]])
+  final case class AddFiling(filing: Filing, replyTo: Option[ActorRef[Filing]])
       extends InstitutionCommand
 
-  case object InstitutionStop extends InstitutionCommand
+  final case class GetInstitution(replyTo: ActorRef[Option[Institution]])
+      extends InstitutionCommand
+
+  final case class GetInstitutionDetails(
+      replyTo: ActorRef[Option[InstitutionDetail]])
+      extends InstitutionCommand
+
+  final case object InstitutionStop extends InstitutionCommand
 }

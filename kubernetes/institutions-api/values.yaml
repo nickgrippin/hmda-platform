@@ -5,7 +5,7 @@
 replicaCount: 1
 
 image:
-  repository: hmda/hmda-institutions-api
+  repository: hmda/institutions-api
   tag: 0.1.3
   pullPolicy: IfNotPresent
 
@@ -53,11 +53,10 @@ tolerations: []
 affinity: {}
 
 postgresql:
-  host: "{{ .Release.Name }}-postgresql.{{ .Release.Namespace }}.svc.cluster.local"
   postgresDatabase: hmda
-  postgresUser: postgres
-  postgresPassword: postgres
+  postgresUser: hmda
   enabled: false
+  createSchema: false
   ssl: require
 
 cassandra:
