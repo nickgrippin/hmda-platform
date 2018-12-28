@@ -17,7 +17,7 @@ import akka.actor.typed.scaladsl.adapter._
 import akka.util.Timeout
 import com.typesafe.config.ConfigFactory
 import hmda.model.filing.submission.SubmissionId
-import hmda.publication.lar.publication.{ModifiedLarPublisher, UploadToS3}
+import hmda.publication.lar.publication.{IrsPublisher, PublishIrs}
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -28,12 +28,12 @@ object IrsPublisherApp extends App {
 
   log.info(
     """
-      |___  ___          _ _  __ _          _   _       ___  ______
-      ||  \/  |         | (_)/ _(_)        | | | |     / _ \ | ___ \
-      || .  . | jmo   __| |_| |_ _  ___  __| | | |    / /_\ \| |_/ /
-      || |\/| |/ _ \ / _` | |  _| |/ _ \/ _` | | |    |  _  ||    /
-      || |  | | (_) | (_| | | | | |  __/ (_| | | |____| | | || |\ \
-      |\_|  |_/\___/ \__,_|_|_| |_|\___|\__,_| \_____/\_| |_/\_| \_|
+      |
+      |,--.,------.  ,---.      ,------.         ,--.   ,--.,--.       ,--.
+      ||  ||  .--. ''   .-'     |  .--. ',--.,--.|  |-. |  |`--' ,---. |  ,---.  ,---. ,--.--.
+      ||  ||  '--'.'`.  `-.     |  '--' ||  ||  || .-. '|  |,--.(  .-' |  .-.  || .-. :|  .--'
+      ||  ||  |\  \ .-'    |    |  | --' '  ''  '| `-' ||  ||  |.-'  `)|  | |  |\   --.|  |
+      |`--'`--' '--'`-----'     `--'      `----'  `---' `--'`--'`----' `--' `--' `----'`--'
       |
     """.stripMargin
   )
@@ -47,7 +47,7 @@ object IrsPublisherApp extends App {
   val kafkaConfig = system.settings.config.getConfig("akka.kafka.consumer")
   val config = ConfigFactory.load()
 
-  val parallelism = config.getInt("hmda.lar.modified.parallelism")
+  val parallelism = config.getInt("hmda.lar.irs.parallelism")
 
   val irsPublisher =
     system.spawn(IrsPublisher.behavior, IrsPublisher.name)

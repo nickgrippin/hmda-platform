@@ -57,8 +57,8 @@ case class MsaMap(
  msas: Map[String, Msa] = Map[String, Msa]()
 ) {
   def +(lar: LoanApplicationRegister): MsaMap = {
-    val id = lar.geography.msa
-    val original = msas.getOrElse(id, Msa(id, CbsaLookup.nameFor(id)))
+    val id = ""
+    val original = msas.getOrElse(id, Msa(id, ""))
     val modified = original.addLar(lar)
     MsaMap(msas + ((id, modified)))
   }
@@ -103,7 +103,7 @@ case class MsaSummary(
     )
   }
 
-  def toCsv: String = s"Totals,, $lars, $amount, $conv, $FHA, $VA, $FSA, $oneToFourFamily, $MFD, $multiFamily, $homePurchase, $homeImprovement, $refinance"
+  def toCsv: String = s"Totals,, $lars, $amount, $conv, $FHA, $VA, $FSA, $siteBuilt, $manufactured, $oneToFour, $fivePlus, $homePurchase, $homeImprovement, $refinancing, $cashOutRefinancing, $otherPurpose, $notApplicablePurpose"
 }
 
 case object MsaSummary {

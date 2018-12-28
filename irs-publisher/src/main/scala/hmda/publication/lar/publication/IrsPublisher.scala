@@ -38,7 +38,7 @@ object IrsPublisher {
     override def getRegion: String = region
   }
 
-  val behavior: Behavior[ModifiedLarCommand] =
+  val behavior: Behavior[IrsPublisherCommand] =
     Behaviors.setup { ctx =>
       val log = ctx.log
       val decider: Supervision.Decider = {
