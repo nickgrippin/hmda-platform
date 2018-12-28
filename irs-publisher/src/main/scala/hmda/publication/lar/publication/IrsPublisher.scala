@@ -7,13 +7,18 @@ import akka.stream.{ActorMaterializer, ActorMaterializerSettings, Supervision}
 import akka.stream.alpakka.s3.impl.ListBucketVersion2
 import akka.stream.alpakka.s3.javadsl.S3Client
 import akka.stream.alpakka.s3.{MemoryBufferType, S3Settings}
+import akka.stream.scaladsl.{Sink, Source}
 import akka.util.ByteString
 import com.amazonaws.auth.{AWSStaticCredentialsProvider, BasicAWSCredentials}
 import com.amazonaws.regions.AwsRegionProvider
 import com.typesafe.config.ConfigFactory
+import hmda.model.filing.lar.LoanApplicationRegister
 import hmda.model.filing.submission.SubmissionId
-import hmda.publication.lar.parser.ModifiedLarCsvParser
+import hmda.parser.filing.lar.LarCsvParser
+import hmda.publication.lar.model.{MsaMap, MsaSummary}
 import hmda.query.HmdaQuery._
+
+import scala.util.{Failure, Success}
 
 sealed trait IrsPublisherCommand
 case class PublishIrs(submissionId: SubmissionId) extends IrsPublisherCommand
@@ -29,7 +34,7 @@ object IrsPublisher {
   val region = config.getString("aws.region")
   val bucket = config.getString("aws.public-bucket")
   val environment = config.getString("aws.environment")
-  val year = config.getInt("hmda.lar.modified.year")
+  val year = config.getInt("hmda.lar.irs.year")
 
   val awsCredentialsProvider = new AWSStaticCredentialsProvider(
     new BasicAWSCredentials(accessKeyId, secretAccess))
@@ -46,6 +51,7 @@ object IrsPublisher {
           log.error(e.getLocalizedMessage)
           Supervision.Resume
       }
+      implicit val ec = ctx.system.executionContext
       implicit val system = ctx.system.toUntyped
       implicit val materializer = ActorMaterializer(
         ActorMaterializerSettings(system).withSupervisionStrategy(decider))
@@ -69,18 +75,27 @@ object IrsPublisher {
         case PublishIrs(submissionId) =>
           log.info(s"Publishing IRS for $submissionId")
 
-          val fileName = s"${submissionId.lei}.txt"
-
           val s3Sink = s3Client.multipartUpload(
             bucket,
-            s"$environment/modified-lar/$year/$fileName")
+            s"$environment/reports/disclosure/$year/${submissionId.lei}/nationwide/IRS.txt")
 
-          readRawData(submissionId)
+          val msaMapF = readRawData(submissionId)
             .map(l => l.data)
             .drop(1)
-            .map(s => ModifiedLarCsvParser(s).toCSV + "\n")
-            .map(s => ByteString(s))
-            .runWith(s3Sink)
+            .map(s => LarCsvParser(s).getOrElse(LoanApplicationRegister()))
+            .fold(MsaMap())((map, lar) => map + lar)
+            .runWith(Sink.last)
+
+          msaMapF.onComplete(_ => {
+            case Success(msaMap: MsaMap) =>
+              log.info(s"Uploading IRS to S3 for $submissionId")
+              val msaSeq = msaMap.msas.values.toSeq
+              val msaSummary = MsaSummary.fromMsaCollection(msaSeq)
+              //TODO: Maybe add a header row here?
+              val bytes = msaSeq.map(msa => ByteString(msa.toCsv + "\n")) :+ ByteString(msaSummary.toCsv)
+              Source(bytes.toList).runWith(s3Sink)
+            case Failure(e) => log.error(s"Reading Cassandra journal failed: $e")
+          })
 
           Behaviors.same
 
